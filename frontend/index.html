@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Stress Detection</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>Crowd Safety AI</h1>
+            </div>
+            <div class="header-status">
+                <span id="systemStatus">STATUS: Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Left Column: Video Feed & Controls -->
+            <div class="left-column">
+                <!-- Control Panel -->
+                <div class="card control-panel">
+                    <h2>Control Panel</h2>
+                    <div class="control-buttons">
+                        <button class="btn" id="uploadBtn">Upload Video</button>
+                        <button class="btn" id="stopBtn" disabled>Stop</button>
+                    </div>
+                    <input type="file" id="videoInput" accept="video/*" style="display: none;">
+                </div>
+
+                <!-- Video Feed -->
+                <div class="card video-container">
+                    <div class="card-header">
+                        <h2>Live Feed</h2>
+                        <div class="crowd-count" id="crowdCount">
+                            <span>People Count: </span>
+                            <span class="count-value">0</span>
+                        </div>
+                    </div>
+                    <div class="video-wrapper">
+                        <img id="videoFeed" src="" alt="Live Feed">
+                        <div class="video-placeholder" id="videoPlaceholder">
+                            <p>[ Upload video to begin ]</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Analytics & Alerts -->
+            <div class="right-column">
+                <!-- Risk Level Indicator -->
+                <div class="card risk-indicator" id="riskCard">
+                    <h2>Risk Assessment</h2>
+                    <div class="risk-display">
+                        <div class="risk-level" id="riskLevel">LOW</div>
+                    </div>
+                    <div class="risk-trend" id="riskTrend">
+                        <span>Trend: </span><span id="trendValue">Stable</span>
+                    </div>
+                </div>
+
+                <!-- Alerts Panel -->
+                <div class="card alerts-panel">
+                    <div class="card-header">
+                        <h2>Active Alerts (<span class="alert-count" id="alertCount">0</span>)</h2>
+                    </div>
+                    <div class="alerts-list" id="alertsList">
+                        <div class="no-alerts">No active alerts</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        PROCESSING...
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

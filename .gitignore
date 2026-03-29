@@ -1,0 +1,39 @@
+# Environment
+venv/
+env/
+*.pyc
+__pycache__/
+
+# Uploads and datasets
+static/uploads/*.mp4
+static/uploads/*.avi
+static/uploads/*.jpg
+static/uploads/*.png
+datasets/*
+!datasets/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# Test files
+test_smtp.py
+smtp_test_results.txt
+debug_env.py
+debug_video.py
+
+# YOLO weights cache
+*.pt
+!yolov8*.pt
