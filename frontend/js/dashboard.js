@@ -12,6 +12,8 @@ const videoPlaceholder = document.getElementById('videoPlaceholder');
 // const twinPlaceholder = document.getElementById('twinPlaceholder');
 const crowdCount = document.querySelector('.count-value');
 const riskLevel = document.getElementById('riskLevel');
+const lstmLevel = document.getElementById('lstmLevel');
+const lstmScore = document.getElementById('lstmScore');
 const trendValue = document.getElementById('trendValue');
 const alertsList = document.getElementById('alertsList');
 const alertCount = document.getElementById('alertCount');
@@ -64,6 +66,9 @@ socket.on('frame_data', (data) => {
 
     // Update risk level
     updateRiskLevel(data.risk_level);
+
+    // Update AI risk level
+    updateLSTMRisk(data.lstm_level, data.lstm_score);
 
     // Update alerts
     updateAlerts(data.alerts);
@@ -196,6 +201,25 @@ function formatAdvice(text) {
 function updateRiskLevel(level) {
     currentRiskLevel = level;
     riskLevel.textContent = level;
+    // Basic color fallback
+    if (level === 'HIGH') riskLevel.style.color = '#ff4c4c';
+    else if (level === 'MEDIUM') riskLevel.style.color = '#ffa500';
+    else riskLevel.style.color = '#4caf50';
+}
+
+function updateLSTMRisk(level, score) {
+    if (!lstmLevel) return;
+    lstmLevel.textContent = level;
+    if (level === 'UNSAFE' || level === 'HIGH') {
+        lstmLevel.style.color = '#ff4c4c';
+        if (lstmScore) lstmScore.style.color = '#ff4c4c';
+    } else {
+        lstmLevel.style.color = '#4caf50';
+        if (lstmScore) lstmScore.style.color = '#888';
+    }
+    if (lstmScore) {
+        lstmScore.textContent = `Probability: ${(score * 100).toFixed(1)}%`;
+    }
 }
 
 function updateAlerts(alerts) {
