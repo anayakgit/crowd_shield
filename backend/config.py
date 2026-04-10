@@ -15,8 +15,8 @@ class Config:
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
     
     # Risk level thresholds
-    LOW_RISK_THRESHOLD = float(os.getenv('LOW_RISK_THRESHOLD', '0.3'))
-    MEDIUM_RISK_THRESHOLD = float(os.getenv('MEDIUM_RISK_THRESHOLD', '0.6'))
+    LOW_RISK_THRESHOLD = float(os.getenv('LOW_RISK_THRESHOLD', '0.25'))
+    MEDIUM_RISK_THRESHOLD = float(os.getenv('MEDIUM_RISK_THRESHOLD', '0.55'))
     
     # YOLO configuration
     YOLO_MODEL = os.getenv('YOLO_MODEL', 'yolov8m.pt')

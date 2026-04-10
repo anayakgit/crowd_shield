@@ -158,7 +158,7 @@ class LSTMPredictor:
                 tensor = tensor.unsqueeze(0).to(self.device)        # [1, W, 4]
                 prob = float(self.model(tensor).item())
 
-            label = 'UNSAFE' if prob >= 0.5 else 'SAFE'
+            label = 'UNSAFE' if prob >= 0.4 else 'SAFE'
             return {'probability': round(prob, 4), 'label': label, 'ready': True}
 
         except Exception as e:

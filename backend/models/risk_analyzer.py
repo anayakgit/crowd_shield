@@ -106,7 +106,9 @@ class RiskAnalyzer:
                 'iot': iot_score
             },
             'alerts': alerts,
-            'crowd_count': crowd_count
+            'crowd_count': crowd_count,
+            'lstm_level': lstm_label,
+            'lstm_score': lstm_score
         }
         
         self.risk_history.append(risk_result)

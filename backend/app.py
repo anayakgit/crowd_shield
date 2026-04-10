@@ -493,6 +493,8 @@ def stream_video():
                     'risk_level': risk_result['level'],
                     'crowd_count': detections['count'],
                     'alerts': risk_result['alerts'],
+                    'lstm_level': risk_result.get('lstm_level', 'SAFE'),
+                    'lstm_score': risk_result.get('lstm_score', 0.0)
                     # 'iot_data': iot_data
                 })
                 
