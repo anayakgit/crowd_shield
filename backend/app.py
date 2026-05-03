@@ -236,7 +236,17 @@ def process_timed_email_alerts(risk_result, crowd_count):
     if len(current_state['email_alerts']) > 30:
         current_state['email_alerts'].pop(0)
 
+    # Emit email alert event for dashboard
     socketio.emit('email_alert', alert_event)
+    
+    # 🔔 Emit mobile alert for both HIGH and MEDIUM risks
+    risk_level = 'HIGH' if 'HIGH' in alert_reason else 'MEDIUM'
+    mobile_alert = {
+        'risk_level': risk_level,
+        'message': f'🚨 {alert_reason}',
+        'duration': '10 seconds' if risk_level == 'MEDIUM' else '5 seconds'
+    }
+    socketio.emit('alert', mobile_alert)
 
 
 @app.route('/')
@@ -398,7 +408,7 @@ def get_email_alerts():
 
 @app.route('/api/test_email_alert', methods=['POST'])
 def test_email_alert():
-    """Send a manual test email alert to configured destination."""
+    """Send a manual test email alert to configured destination and mobile app."""
     config = current_state.get('email_alert_config', {})
     target_email = config.get('email', '')
     if not target_email:
@@ -422,10 +432,21 @@ def test_email_alert():
     if len(current_state['email_alerts']) > 30:
         current_state['email_alerts'].pop(0)
 
+    # Emit email alert event for dashboard
     socketio.emit('email_alert', alert_event)
+    
+    # 🔔 Also send alert to mobile app via socket
+    mobile_alert = {
+        'risk_level': 'HIGH',
+        'message': '🚨 Test Alert from Dashboard',
+        'duration': '5 seconds'
+    }
+    socketio.emit('alert', mobile_alert)
+    
     return jsonify({
         'message': 'Test email alert attempted',
-        'alert': alert_event
+        'alert': alert_event,
+        'mobile_alert_sent': True
     })
 
 
