@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = PROJECT_ROOT / '.env'
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 class Config:
     """Application configuration"""
@@ -55,3 +58,7 @@ class Config:
     SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
     NOTIFICATION_EMAIL = os.getenv('NOTIFICATION_EMAIL', '')
+    
+    # Timed alert thresholds
+    LSTM_MEDIUM_ALERT_THRESHOLD = float(os.getenv('LSTM_MEDIUM_ALERT_THRESHOLD', '0.55'))
+    LSTM_HIGH_ALERT_THRESHOLD = float(os.getenv('LSTM_HIGH_ALERT_THRESHOLD', '0.80'))

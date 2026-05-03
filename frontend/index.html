@@ -30,6 +30,20 @@
                         <button class="btn" id="stopBtn" disabled>Stop</button>
                     </div>
                     <input type="file" id="videoInput" accept="video/*" style="display: none;">
+                    
+                    <div class="mobile-alert-config">
+                        <h3>Email Alert Settings</h3>
+                        <input type="email" id="alertEmailInput" class="text-input" placeholder="alerts@example.com">
+                        <label class="checkbox-line">
+                            <input type="checkbox" id="enableEmailAlerts">
+                            Enable timed LSTM email alerts
+                        </label>
+                        <div class="control-buttons">
+                            <button class="btn" id="saveEmailAlertBtn">Save Email Alert Settings</button>
+                            <button class="btn" id="testEmailAlertBtn">Send Test Email Alert</button>
+                        </div>
+                        <div id="emailAlertStatus" class="small-status">No email configured</div>
+                    </div>
                 </div>
 
                 <!-- Video Feed -->
@@ -76,6 +90,10 @@
                     </div>
                     <div class="alerts-list" id="alertsList">
                         <div class="no-alerts">No active alerts</div>
+                    </div>
+                    <div class="mobile-alert-events" id="emailAlertEvents">
+                        <h3>Recent Email Alerts</h3>
+                        <div class="no-alerts">No email alerts sent yet</div>
                     </div>
                 </div>
             </div>
