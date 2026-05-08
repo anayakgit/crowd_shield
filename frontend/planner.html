@@ -20,8 +20,10 @@
         .tool-btn:hover { background: #f0f0f0; border-color: #ccc; }
         .tool-btn.active { background: #000; color: #fff; border-color: #000; }
         
-        .audit-results { margin-top: 20px; padding: 15px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #007bff; font-size: 0.85rem; line-height: 1.5; }
+        .audit-results { position: relative; margin-top: 20px; padding: 15px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #007bff; font-size: 0.85rem; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .audit-results h4 { margin-top: 0; color: #0056b3; }
+        .close-audit-btn { position: absolute; right: 10px; top: 10px; cursor: pointer; font-size: 1.2rem; line-height: 1; color: #0056b3; opacity: 0.5; transition: opacity 0.2s; }
+        .close-audit-btn:hover { opacity: 1; }
         
         .obj-label { position: absolute; font-size: 0.7rem; font-weight: 700; color: #fff; pointer-events: none; transform: translate(-50%, -50%); }
     </style>
@@ -117,6 +119,7 @@
         <!-- Audit Results Panel (Sliding or Sidebar) -->
         <div id="auditBox" style="position: absolute; right: 20px; top: 100px; width: 300px; display: none;">
             <div class="audit-results">
+                <span class="close-audit-btn" onclick="closeAudit()">&times;</span>
                 <h4>Audit Report</h4>
                 <div id="auditText" style="max-height: 400px; overflow-y: auto;"></div>
             </div>

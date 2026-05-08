@@ -363,6 +363,10 @@ async function runAiAudit() {
     }
 }
 
+function closeAudit() {
+    document.getElementById('auditBox').style.display = 'none';
+}
+
 function startSimulation() {
     let people = [];
     const sources = objects.filter(o => o.type === 'source');

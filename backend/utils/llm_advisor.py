@@ -7,8 +7,9 @@ class LLMAdvisor:
     def __init__(self):
         if Config.GEMINI_API_KEY:
             # Using the new google-genai SDK
-            self.client = genai.Client(api_key=Config.GEMINI_API_KEY)
-            self.model_id = 'gemini-2.0-flash' 
+            # Explicitly use v1 API version to avoid v1beta 404 issues
+            self.client = genai.Client(api_key=Config.GEMINI_API_KEY, http_options={'api_version': 'v1'})
+            self.model_id = 'gemini-1.5-flash'
             self.enabled = True
         else:
             self.enabled = False
