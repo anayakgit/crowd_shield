@@ -15,11 +15,11 @@ let activePersonnelAreaId = null;
 
 // ---- DOM ----
 const areaList = document.getElementById('areaList');
-const areasGrid = document.getElementById('areasGrid');
+const mainContent = document.getElementById('mainContent');
 const emptyState = document.getElementById('emptyState');
 const connectionBadge = document.getElementById('connectionBadge');
 const connectionText = document.getElementById('connectionText');
-const headerTimeEl = document.getElementById('headerTime');
+const systemTimeEl = document.getElementById('systemTime');
 const statAreas = document.getElementById('statAreas');
 const statFeeds = document.getElementById('statFeeds');
 const statHigh = document.getElementById('statHigh');
@@ -28,8 +28,8 @@ const statHigh = document.getElementById('statHigh');
 // ---- Clock ----
 function updateClock() {
     const now = new Date();
-    if (headerTimeEl) {
-        headerTimeEl.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+    if (systemTimeEl) {
+        systemTimeEl.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
     }
 }
 setInterval(updateClock, 1000);
