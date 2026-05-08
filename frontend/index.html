@@ -3,92 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crowd Stress Detection</title>
+    <title>CrowdShield — Area-Based Monitoring</title>
+    <meta name="description" content="AI crowd safety monitoring with multi-area, multi-camera support.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <h1>Crowd Safety AI</h1>
-            </div>
-            <div class="header-status">
-                <span id="systemStatus">STATUS: Connecting...</span>
-            </div>
-        </header>
 
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Left Column: Video Feed & Controls -->
-            <div class="left-column">
-                <!-- Control Panel -->
-                <div class="card control-panel">
-                    <h2>Control Panel</h2>
-                    <div class="control-buttons">
-                        <button class="btn" id="uploadBtn">Upload Video</button>
-                        <button class="btn" id="stopBtn" disabled>Stop</button>
-                    </div>
-                    <input type="file" id="videoInput" accept="video/*" style="display: none;">
-                </div>
-
-                <!-- Video Feed -->
-                <div class="card video-container">
-                    <div class="card-header">
-                        <h2>Live Feed</h2>
-                        <div class="crowd-count" id="crowdCount">
-                            <span>People Count: </span>
-                            <span class="count-value">0</span>
-                        </div>
-                    </div>
-                    <div class="video-wrapper">
-                        <img id="videoFeed" src="" alt="Live Feed">
-                        <div class="video-placeholder" id="videoPlaceholder">
-                            <p>[ Upload video to begin ]</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Analytics & Alerts -->
-            <div class="right-column">
-                <!-- Risk Level Indicator -->
-                <div class="card risk-indicator" id="riskCard">
-                    <h2>Manual Risk Assessment</h2>
-                    <div class="risk-display" style="margin-bottom: 20px;">
-                        <div class="risk-level" id="riskLevel">LOW</div>
-                    </div>
-                    
-                    <h2 style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">AI LSTM Model</h2>
-                    <div class="risk-display">
-                        <div class="risk-level" id="lstmLevel" style="font-size: 24px;">SAFE</div>
-                        <div id="lstmScore" style="color: #888; font-size: 14px; text-align: center; margin-top: 5px;">Probability: 0.0%</div>
-                    </div>
-                    <div class="risk-trend" id="riskTrend">
-                        <span>Trend: </span><span id="trendValue">Stable</span>
-                    </div>
-                </div>
-
-                <!-- Alerts Panel -->
-                <div class="card alerts-panel">
-                    <div class="card-header">
-                        <h2>Active Alerts (<span class="alert-count" id="alertCount">0</span>)</h2>
-                    </div>
-                    <div class="alerts-list" id="alertsList">
-                        <div class="no-alerts">No active alerts</div>
-                    </div>
-                </div>
-            </div>
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <span class="logo-icon">C</span>
+        <div>
+            <span class="logo-title">CrowdShield</span>
+            <span class="logo-sub">AI Safety System</span>
         </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        PROCESSING...
+    <div class="sidebar-section">
+        <div class="section-label">System</div>
+        <div class="connection-badge" id="connectionBadge">
+            <span class="badge-dot"></span>
+            <span id="connectionText">Connecting…</span>
+        </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="js/dashboard.js"></script>
+    <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+        <div class="section-label-row">
+            <span class="section-label">Areas</span>
+            <button class="btn-inline" onclick="openAreaModal()">+ New Area</button>
+        </div>
+        <div id="areaList"><div class="no-items">No areas yet</div></div>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="stat-row"><span class="stat-label">Areas</span><span class="stat-val" id="statAreas">0</span></div>
+        <div class="stat-row"><span class="stat-label">Active Feeds</span><span class="stat-val" id="statFeeds">0</span></div>
+        <div class="stat-row"><span class="stat-label">HIGH Risk</span><span class="stat-val" id="statHigh">0</span></div>
+    </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main-content">
+    <header class="topbar">
+        <div class="topbar-left">
+            <h1 class="topbar-title">Live Monitoring</h1>
+            <span class="topbar-time" id="systemTime"></span>
+        </div>
+        <div class="topbar-right">
+            <div class="layout-toggle">
+                <button class="layout-btn" id="layout1" onclick="setLayout(1)">1</button>
+                <button class="layout-btn active" id="layout2" onclick="setLayout(2)">2</button>
+                <button class="layout-btn" id="layout3" onclick="setLayout(3)">3</button>
+            </div>
+        </div>
+    </header>
+
+    <div id="mainContent">
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">#</div>
+            <h2>No Areas Added</h2>
+            <p>Create an area first, then add cameras to start monitoring.</p>
+            <button class="btn-primary" onclick="openAreaModal()">Create First Area</button>
+        </div>
+    </div>
+</main>
+
+<!-- ===== MODAL: New Area ===== -->
+<div class="modal-overlay" id="areaModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>New Monitoring Area</h2>
+            <button class="modal-close" onclick="closeAreaModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="form-label">Area Name *</label>
+            <input class="form-input" id="areaName" type="text" placeholder="e.g. North Gate, Sheep Pen A">
+
+            <label class="form-label" style="margin-top:14px;">Description</label>
+            <input class="form-input" id="areaDesc" type="text" placeholder="Optional description">
+
+            <label class="form-label" style="margin-top:14px;">Capacity Limit</label>
+            <input class="form-input" id="areaCapacity" type="number" min="0" placeholder="Max people (0 = unlimited)">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeAreaModal()">Cancel</button>
+            <button class="btn-primary" onclick="createArea()">Create Area</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL: Add Camera ===== -->
+<div class="modal-overlay" id="cameraModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Camera to <span id="modalAreaName">Area</span></h2>
+            <button class="modal-close" onclick="closeCameraModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="form-label">Camera Name *</label>
+            <input class="form-input" id="camName" type="text" placeholder="e.g. Entrance Cam 1">
+
+            <label class="form-label" style="margin-top:14px;">Camera Type</label>
+            <select class="form-input" id="camType">
+                <option value="entry">Entry — People flowing in</option>
+                <option value="exit">Exit — People flowing out</option>
+                <option value="center">Center — Middle of area</option>
+                <option value="perimeter">Perimeter — Boundary / edge</option>
+                <option value="other" selected>Other</option>
+            </select>
+
+            <label class="form-label" style="margin-top:14px;">Description</label>
+            <input class="form-input" id="camDescription" type="text" placeholder="e.g. Facing main gate, left side">
+
+            <label class="form-label" style="margin-top:14px;">Upload Video</label>
+            <div class="file-drop-zone" id="camDropZone" onclick="document.getElementById('camFileInput').click()">
+                <div class="drop-icon">V</div>
+                <div class="drop-text" id="camDropText">Click or drag video here</div>
+                <div class="drop-hint">MP4, AVI, MOV — up to 500 MB</div>
+            </div>
+            <input type="file" id="camFileInput" accept="video/*" style="display:none;">
+
+            <div id="camUploadProgress" style="display:none; margin-top:12px;">
+                <div class="progress-bar-track"><div class="progress-bar-fill" id="camProgressFill"></div></div>
+                <span class="progress-label" id="camProgressLabel">Uploading…</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeCameraModal()">Cancel</button>
+            <button class="btn-primary" id="camSubmitBtn" onclick="uploadCamera()" disabled>Start Monitoring</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL: Add Personnel ===== -->
+<div class="modal-overlay" id="personnelModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Personnel to <span id="pModalAreaName">Area</span></h2>
+            <button class="modal-close" onclick="closePersonnelModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="form-label">Full Name *</label>
+            <input class="form-input" id="pName" type="text" placeholder="e.g. Ravi Kumar">
+
+            <label class="form-label" style="margin-top:14px;">Role</label>
+            <input class="form-input" id="pRole" type="text" placeholder="e.g. Security Officer, Supervisor">
+
+            <label class="form-label" style="margin-top:14px;">Email</label>
+            <input class="form-input" id="pEmail" type="email" placeholder="e.g. ravi@example.com">
+
+            <label class="form-label" style="margin-top:14px;">Phone</label>
+            <input class="form-input" id="pPhone" type="tel" placeholder="e.g. +91 98765 43210">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closePersonnelModal()">Cancel</button>
+            <button class="btn-primary" onclick="addPersonnel()">Add Personnel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="js/dashboard.js"></script>
 </body>
 </html>
