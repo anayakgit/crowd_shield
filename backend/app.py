@@ -7,6 +7,7 @@ import os
 import base64
 from datetime import datetime
 import json
+import re
 
 from backend.config import Config
 from backend.models.yolo_detector import YOLODetector
@@ -89,12 +90,25 @@ current_state = {
     'alerts': [],
     'iot_data': {},
     'digital_twin_state': {},
-    'stream_session_id': 0  # Track stream sessions to handle race conditions
+    'stream_session_id': 0,  # Track stream sessions to handle race conditions
+    'email_alert_config': {
+        'email': '',
+        'enabled': False
+    },
+    'email_alerts': []
+}
+
+lstm_alert_tracker = {
+    'last_timestamp': None,
+    'high_seconds': 0.0,
+    'medium_seconds': 0.0,
+    'high_triggered': False,
+    'medium_triggered': False
 }
 
 def reset_all_state():
     """Reset all component state for new video processing"""
-    global movement_tracker, risk_analyzer, digital_twin
+    global movement_tracker, risk_analyzer, digital_twin, lstm_alert_tracker
     
     print("Resetting all component state...")
     
@@ -116,6 +130,16 @@ def reset_all_state():
     current_state['alerts'] = []
     current_state['iot_data'] = {}
     current_state['digital_twin_state'] = {}
+    current_state['email_alerts'] = []
+    
+    # Reset LSTM alert duration tracker
+    lstm_alert_tracker = {
+        'last_timestamp': None,
+        'high_seconds': 0.0,
+        'medium_seconds': 0.0,
+        'high_triggered': False,
+        'medium_triggered': False
+    }
     
     print("All component state reset complete")
 
@@ -127,6 +151,102 @@ def initialize_yolo():
         print("Initializing YOLO model...")
         yolo_detector = YOLODetector()
         print("YOLO model loaded successfully")
+
+
+def normalize_email(email):
+    """Normalize and validate destination email."""
+    if not email:
+        return ''
+    normalized = email.strip().lower()
+    if re.fullmatch(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', normalized):
+        return normalized
+    return ''
+
+
+def get_lstm_alert_band(lstm_score):
+    """Map LSTM score to LOW/MEDIUM/HIGH band for timed mobile alerts."""
+    if lstm_score >= Config.LSTM_HIGH_ALERT_THRESHOLD:
+        return 'HIGH'
+    if lstm_score >= Config.LSTM_MEDIUM_ALERT_THRESHOLD:
+        return 'MEDIUM'
+    return 'LOW'
+
+
+def process_timed_email_alerts(risk_result, crowd_count):
+    """Trigger email alerts when LSTM risk persists for configured durations."""
+    now = time.monotonic()
+    prev = lstm_alert_tracker['last_timestamp']
+    delta = 0.0 if prev is None else max(0.0, now - prev)
+    lstm_alert_tracker['last_timestamp'] = now
+
+    lstm_band = get_lstm_alert_band(risk_result.get('lstm_score', 0.0))
+    if lstm_band == 'HIGH':
+        lstm_alert_tracker['high_seconds'] += delta
+        lstm_alert_tracker['medium_seconds'] += delta
+    elif lstm_band == 'MEDIUM':
+        lstm_alert_tracker['high_seconds'] = 0.0
+        lstm_alert_tracker['high_triggered'] = False
+        lstm_alert_tracker['medium_seconds'] += delta
+    else:
+        lstm_alert_tracker['high_seconds'] = 0.0
+        lstm_alert_tracker['medium_seconds'] = 0.0
+        lstm_alert_tracker['high_triggered'] = False
+        lstm_alert_tracker['medium_triggered'] = False
+        return
+
+    alert_config = current_state.get('email_alert_config', {})
+    if not alert_config.get('enabled') or not alert_config.get('email'):
+        return
+
+    should_send = False
+    alert_reason = ''
+    if lstm_alert_tracker['high_seconds'] >= 5.0 and not lstm_alert_tracker['high_triggered']:
+        should_send = True
+        alert_reason = 'LSTM HIGH risk persisted for 5 seconds'
+        lstm_alert_tracker['high_triggered'] = True
+        lstm_alert_tracker['medium_triggered'] = True
+    elif lstm_alert_tracker['medium_seconds'] >= 10.0 and not lstm_alert_tracker['medium_triggered']:
+        should_send = True
+        alert_reason = 'LSTM MEDIUM risk persisted for 10 seconds'
+        lstm_alert_tracker['medium_triggered'] = True
+
+    if not should_send:
+        return
+
+    subject = f"[CrowdShield Alert] {alert_reason}"
+    body = (
+        f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Reason: {alert_reason}\n"
+        f"Current system risk: {risk_result.get('level', 'LOW')}\n"
+        f"LSTM score: {risk_result.get('lstm_score', 0.0):.2f}\n"
+        f"People detected: {crowd_count}\n"
+    )
+    target_email = alert_config['email']
+    sent, send_status = notifier.send_custom_email_alert(target_email, subject, body)
+
+    alert_event = {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'email': target_email,
+        'reason': alert_reason,
+        'message': body,
+        'sent': sent,
+        'status': send_status
+    }
+    current_state['email_alerts'].append(alert_event)
+    if len(current_state['email_alerts']) > 30:
+        current_state['email_alerts'].pop(0)
+
+    # Emit email alert event for dashboard
+    socketio.emit('email_alert', alert_event)
+    
+    # 🔔 Emit mobile alert for both HIGH and MEDIUM risks
+    risk_level = 'HIGH' if 'HIGH' in alert_reason else 'MEDIUM'
+    mobile_alert = {
+        'risk_level': risk_level,
+        'message': f'🚨 {alert_reason}',
+        'duration': '10 seconds' if risk_level == 'MEDIUM' else '5 seconds'
+    }
+    socketio.emit('alert', mobile_alert)
 
 
 @app.route('/')
@@ -223,7 +343,36 @@ def get_risk_data():
     return jsonify({
         'risk_level': current_state['risk_level'],
         'alerts': current_state['alerts'],
-        'trend': risk_analyzer.get_risk_trend()
+        'trend': risk_analyzer.get_risk_trend(),
+        'email_alerts': current_state['email_alerts']
+    })
+
+
+@app.route('/api/email_alert_config', methods=['GET', 'POST'])
+def email_alert_config():
+    """Get or update email alert destination and enabled state."""
+    if request.method == 'GET':
+        return jsonify(current_state['email_alert_config'])
+
+    payload = request.get_json(silent=True) or {}
+    email = payload.get('email', '')
+    enabled = bool(payload.get('enabled', False))
+
+    normalized = normalize_email(email)
+    if enabled and not normalized:
+        return jsonify({
+            'error': 'Provide a valid email address (e.g., alerts@example.com)'
+        }), 400
+
+    if normalized:
+        current_state['email_alert_config']['email'] = normalized
+    elif email == '':
+        current_state['email_alert_config']['email'] = ''
+    current_state['email_alert_config']['enabled'] = enabled
+
+    return jsonify({
+        'message': 'Email alert settings updated',
+        'config': current_state['email_alert_config']
     })
 
 
@@ -249,6 +398,56 @@ def get_evacuation_advice():
 def notify_authorities():
     """Manual notification to authorities (Disabled)"""
     return jsonify({'error': 'Notification feature is disabled'}), 403
+
+
+@app.route('/api/email_alerts', methods=['GET'])
+def get_email_alerts():
+    """Get recent email alert events."""
+    return jsonify({'alerts': current_state['email_alerts']})
+
+
+@app.route('/api/test_email_alert', methods=['POST'])
+def test_email_alert():
+    """Send a manual test email alert to configured destination and mobile app."""
+    config = current_state.get('email_alert_config', {})
+    target_email = config.get('email', '')
+    if not target_email:
+        return jsonify({'error': 'No email configured'}), 400
+
+    subject = "[CrowdShield Test] Test email alert"
+    body = (
+        "This is a test email alert from your CrowdShield dashboard.\n"
+        "Timed LSTM alerting is configured correctly."
+    )
+    sent, send_status = notifier.send_custom_email_alert(target_email, subject, body)
+    alert_event = {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'email': target_email,
+        'reason': 'Manual test email alert',
+        'message': body,
+        'sent': sent,
+        'status': send_status
+    }
+    current_state['email_alerts'].append(alert_event)
+    if len(current_state['email_alerts']) > 30:
+        current_state['email_alerts'].pop(0)
+
+    # Emit email alert event for dashboard
+    socketio.emit('email_alert', alert_event)
+    
+    # 🔔 Also send alert to mobile app via socket
+    mobile_alert = {
+        'risk_level': 'HIGH',
+        'message': '🚨 Test Alert from Dashboard',
+        'duration': '5 seconds'
+    }
+    socketio.emit('alert', mobile_alert)
+    
+    return jsonify({
+        'message': 'Test email alert attempted',
+        'alert': alert_event,
+        'mobile_alert_sent': True
+    })
 
 
 @socketio.on('connect')
@@ -396,6 +595,7 @@ def stream_video():
                 )
                 current_state['risk_level'] = risk_result['level']
                 current_state['alerts'] = risk_result['alerts']
+                process_timed_email_alerts(risk_result, detections['count'])
                 
                 # NEW: Track panic initiators
                 if ENABLE_ADVANCED_FEATURES and NEW_FEATURES_AVAILABLE and poses:
@@ -493,6 +693,8 @@ def stream_video():
                     'risk_level': risk_result['level'],
                     'crowd_count': detections['count'],
                     'alerts': risk_result['alerts'],
+                    'lstm_level': risk_result.get('lstm_level', 'SAFE'),
+                    'lstm_score': risk_result.get('lstm_score', 0.0)
                     # 'iot_data': iot_data
                 })
                 

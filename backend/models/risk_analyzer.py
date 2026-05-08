@@ -1,6 +1,11 @@
 import numpy as np
 from backend.config import Config
 
+try:
+    from backend.models.lstm_predictor import LSTMPredictor
+except ImportError:
+    LSTMPredictor = None
+
 class RiskAnalyzer:
     """Analyze crowd data and calculate risk levels"""
     
@@ -9,6 +14,9 @@ class RiskAnalyzer:
         self.alert_active = False
         self.panic_initiators = []  # Track who started panic
         self.pressure_history = []
+        
+        # Initialize LSTM Predictor if available
+        self.lstm_predictor = LSTMPredictor() if LSTMPredictor else None
         
     def calculate_risk_level(self, crowd_count, frame_area, movement_data, iot_data=None, pressure_map=None):
         """
@@ -39,17 +47,32 @@ class RiskAnalyzer:
         # Calculate IoT sensor risk (if available)
         iot_score = self._calculate_iot_score(iot_data) if iot_data else 0.0
         
+        # LSTM Integration
+        lstm_score = 0.0
+        lstm_label = 'SAFE'
+        if self.lstm_predictor and getattr(self.lstm_predictor, 'loaded', False):
+            density_pct = density_score * 100.0
+            avg_speed = float(movement_data.get('movement_magnitude', 0)) if movement_data else 0.0
+            direction_variance = float(movement_data.get('erratic_movements', 0)) if movement_data else 0.0
+            
+            lstm_result = self.lstm_predictor.update(crowd_count, density_pct, avg_speed, direction_variance)
+            if lstm_result['ready']:
+                lstm_score = lstm_result['probability']
+                lstm_label = lstm_result['label']
+
         # Weighted combination
         weights = {
-            'density': 0.5,
-            'movement': 0.3,
-            'iot': 0.2
+            'density': 0.4,
+            'movement': 0.2,
+            'iot': 0.1,
+            'lstm': 0.3
         }
         
         overall_score = float(
             density_score * weights['density'] +
             movement_score * weights['movement'] +
-            iot_score * weights['iot']
+            iot_score * weights['iot'] +
+            lstm_score * weights['lstm']
         )
         
         # Determine risk level
@@ -59,9 +82,19 @@ class RiskAnalyzer:
             risk_level = 'MEDIUM'
         else:
             risk_level = 'HIGH'
+            
+        # Override to HIGH if LSTM is very confident (e.g. > 0.8)
+        if lstm_score > 0.8:
+            risk_level = 'HIGH'
         
         # Generate alerts
         alerts = self._generate_alerts(risk_level, crowd_count, movement_data)
+        if lstm_label == 'UNSAFE' and risk_level != 'HIGH':
+            alerts.append({
+                'severity': 'MEDIUM',
+                'message': 'AI Warning: AI model detects stampede patterns.',
+                'action': 'Observe closely'
+            })
         
         # Store in history
         risk_result = {
@@ -73,7 +106,9 @@ class RiskAnalyzer:
                 'iot': iot_score
             },
             'alerts': alerts,
-            'crowd_count': crowd_count
+            'crowd_count': crowd_count,
+            'lstm_level': lstm_label,
+            'lstm_score': lstm_score
         }
         
         self.risk_history.append(risk_result)

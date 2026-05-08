@@ -12,6 +12,8 @@ const videoPlaceholder = document.getElementById('videoPlaceholder');
 // const twinPlaceholder = document.getElementById('twinPlaceholder');
 const crowdCount = document.querySelector('.count-value');
 const riskLevel = document.getElementById('riskLevel');
+const lstmLevel = document.getElementById('lstmLevel');
+const lstmScore = document.getElementById('lstmScore');
 const trendValue = document.getElementById('trendValue');
 const alertsList = document.getElementById('alertsList');
 const alertCount = document.getElementById('alertCount');
@@ -24,6 +26,12 @@ const alertCount = document.getElementById('alertCount');
 // const notifyBtn = document.getElementById('notifyBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const systemStatus = document.getElementById('systemStatus');
+const alertEmailInput = document.getElementById('alertEmailInput');
+const enableEmailAlerts = document.getElementById('enableEmailAlerts');
+const saveEmailAlertBtn = document.getElementById('saveEmailAlertBtn');
+const testEmailAlertBtn = document.getElementById('testEmailAlertBtn');
+const emailAlertStatus = document.getElementById('emailAlertStatus');
+const emailAlertEvents = document.getElementById('emailAlertEvents');
 
 // State
 let isProcessing = false;
@@ -34,6 +42,8 @@ let currentRiskLevel = 'LOW';
 uploadBtn.addEventListener('click', () => videoInput.click());
 videoInput.addEventListener('change', uploadVideo);
 stopBtn.addEventListener('click', stopProcessing);
+saveEmailAlertBtn.addEventListener('click', saveEmailAlertConfig);
+testEmailAlertBtn.addEventListener('click', sendTestEmailAlert);
 // refreshAdvice.addEventListener('click', fetchEvacuationAdvice);
 // notifyBtn.addEventListener('click', notifyAuthorities);
 
@@ -65,6 +75,9 @@ socket.on('frame_data', (data) => {
     // Update risk level
     updateRiskLevel(data.risk_level);
 
+    // Update AI risk level
+    updateLSTMRisk(data.lstm_level, data.lstm_score);
+
     // Update alerts
     updateAlerts(data.alerts);
 
@@ -75,6 +88,11 @@ socket.on('frame_data', (data) => {
 socket.on('stream_end', (data) => {
     console.log('Stream ended:', data.message);
     showNotification('Video ended', 'info');
+});
+
+socket.on('email_alert', (data) => {
+    renderEmailAlertEvents([data]);
+    showNotification(`Email alert: ${data.reason}`, data.sent ? 'success' : 'error');
 });
 
 // Functions
@@ -196,6 +214,25 @@ function formatAdvice(text) {
 function updateRiskLevel(level) {
     currentRiskLevel = level;
     riskLevel.textContent = level;
+    // Basic color fallback
+    if (level === 'HIGH') riskLevel.style.color = '#ff4c4c';
+    else if (level === 'MEDIUM') riskLevel.style.color = '#ffa500';
+    else riskLevel.style.color = '#4caf50';
+}
+
+function updateLSTMRisk(level, score) {
+    if (!lstmLevel) return;
+    lstmLevel.textContent = level;
+    if (level === 'UNSAFE' || level === 'HIGH') {
+        lstmLevel.style.color = '#ff4c4c';
+        if (lstmScore) lstmScore.style.color = '#ff4c4c';
+    } else {
+        lstmLevel.style.color = '#4caf50';
+        if (lstmScore) lstmScore.style.color = '#888';
+    }
+    if (lstmScore) {
+        lstmScore.textContent = `Probability: ${(score * 100).toFixed(1)}%`;
+    }
 }
 
 function updateAlerts(alerts) {
@@ -218,6 +255,128 @@ function updateAlerts(alerts) {
     });
 
     alertsList.innerHTML = html;
+}
+
+async function loadEmailAlertConfig() {
+    try {
+        const response = await fetch('/api/email_alert_config');
+        const result = await response.json();
+        if (!response.ok) return;
+        alertEmailInput.value = result.email || '';
+        enableEmailAlerts.checked = !!result.enabled;
+        updateEmailAlertStatus(result);
+    } catch (error) {
+        console.error('Error loading email alert config:', error);
+    }
+}
+
+async function saveEmailAlertConfig() {
+    const payload = {
+        email: alertEmailInput.value.trim(),
+        enabled: enableEmailAlerts.checked
+    };
+
+    try {
+        const response = await fetch('/api/email_alert_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            const config = result.config || {};
+            alertEmailInput.value = config.email || '';
+            enableEmailAlerts.checked = !!config.enabled;
+            updateEmailAlertStatus(config);
+            showNotification('Email alert settings saved', 'success');
+        } else {
+            showNotification(result.error || 'Failed to save email alert settings', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving email alert config:', error);
+        showNotification('Error saving email alert settings', 'error');
+    }
+}
+
+async function sendTestEmailAlert() {
+    try {
+        const response = await fetch('/api/test_email_alert', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        if (response.ok) {
+            if (result.alert) {
+                renderEmailAlertEvents([result.alert]);
+            }
+            showNotification('Test email alert sent', 'success');
+        } else {
+            showNotification(result.error || 'Failed to send test email alert', 'error');
+        }
+    } catch (error) {
+        console.error('Error sending test email alert:', error);
+        showNotification('Error sending test email alert', 'error');
+    }
+}
+
+function updateEmailAlertStatus(config) {
+    if (!config.email) {
+        emailAlertStatus.textContent = 'No email configured';
+        return;
+    }
+    emailAlertStatus.textContent = config.enabled
+        ? `Alerts active for ${config.email}`
+        : `Email saved (${config.email}), alerts disabled`;
+}
+
+async function loadEmailAlertEvents() {
+    try {
+        const response = await fetch('/api/email_alerts');
+        const result = await response.json();
+        if (!response.ok) return;
+        renderEmailAlertEvents(result.alerts || [], true);
+    } catch (error) {
+        console.error('Error loading email alerts:', error);
+    }
+}
+
+function renderEmailAlertEvents(alerts, replace = false) {
+    if (!emailAlertEvents) return;
+    const existing = emailAlertEvents.querySelectorAll('.alert-item.mobile');
+    if (replace) {
+        existing.forEach(el => el.remove());
+    }
+
+    const list = replace ? alerts.slice().reverse() : alerts;
+    if (replace && list.length === 0) {
+        emailAlertEvents.innerHTML = `
+            <h3>Recent Email Alerts</h3>
+            <div class="no-alerts">No email alerts sent yet</div>
+        `;
+        return;
+    }
+
+    if (emailAlertEvents.querySelector('.no-alerts')) {
+        emailAlertEvents.querySelector('.no-alerts').remove();
+    }
+
+    list.forEach(alert => {
+        const item = document.createElement('div');
+        item.className = 'alert-item mobile';
+        item.innerHTML = `
+            <div class="alert-severity">${alert.sent ? 'sent' : 'failed'} - ${alert.reason}</div>
+            <div class="alert-message">${alert.timestamp} -> ${alert.email}</div>
+        `;
+        emailAlertEvents.appendChild(item);
+    });
+
+    const maxVisible = 8;
+    const all = emailAlertEvents.querySelectorAll('.alert-item.mobile');
+    if (all.length > maxVisible) {
+        for (let i = 0; i < all.length - maxVisible; i += 1) {
+            all[i].remove();
+        }
+    }
 }
 
 function updateIoTData(data) {
@@ -313,4 +472,6 @@ function capitalizeFirst(str) {
 
 // Initialize
 updateControlButtons();
+loadEmailAlertConfig();
+loadEmailAlertEvents();
 console.log('Dashboard initialized');

@@ -30,6 +30,20 @@
                         <button class="btn" id="stopBtn" disabled>Stop</button>
                     </div>
                     <input type="file" id="videoInput" accept="video/*" style="display: none;">
+                    
+                    <div class="mobile-alert-config">
+                        <h3>Email Alert Settings</h3>
+                        <input type="email" id="alertEmailInput" class="text-input" placeholder="alerts@example.com">
+                        <label class="checkbox-line">
+                            <input type="checkbox" id="enableEmailAlerts">
+                            Enable timed LSTM email alerts
+                        </label>
+                        <div class="control-buttons">
+                            <button class="btn" id="saveEmailAlertBtn">Save Email Alert Settings</button>
+                            <button class="btn" id="testEmailAlertBtn">Send Test Email Alert</button>
+                        </div>
+                        <div id="emailAlertStatus" class="small-status">No email configured</div>
+                    </div>
                 </div>
 
                 <!-- Video Feed -->
@@ -54,9 +68,15 @@
             <div class="right-column">
                 <!-- Risk Level Indicator -->
                 <div class="card risk-indicator" id="riskCard">
-                    <h2>Risk Assessment</h2>
-                    <div class="risk-display">
+                    <h2>Manual Risk Assessment</h2>
+                    <div class="risk-display" style="margin-bottom: 20px;">
                         <div class="risk-level" id="riskLevel">LOW</div>
+                    </div>
+                    
+                    <h2 style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">AI LSTM Model</h2>
+                    <div class="risk-display">
+                        <div class="risk-level" id="lstmLevel" style="font-size: 24px;">SAFE</div>
+                        <div id="lstmScore" style="color: #888; font-size: 14px; text-align: center; margin-top: 5px;">Probability: 0.0%</div>
                     </div>
                     <div class="risk-trend" id="riskTrend">
                         <span>Trend: </span><span id="trendValue">Stable</span>
@@ -70,6 +90,10 @@
                     </div>
                     <div class="alerts-list" id="alertsList">
                         <div class="no-alerts">No active alerts</div>
+                    </div>
+                    <div class="mobile-alert-events" id="emailAlertEvents">
+                        <h3>Recent Email Alerts</h3>
+                        <div class="no-alerts">No email alerts sent yet</div>
                     </div>
                 </div>
             </div>

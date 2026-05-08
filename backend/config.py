@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = PROJECT_ROOT / '.env'
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 class Config:
     """Application configuration"""
@@ -15,8 +18,8 @@ class Config:
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
     
     # Risk level thresholds
-    LOW_RISK_THRESHOLD = float(os.getenv('LOW_RISK_THRESHOLD', '0.3'))
-    MEDIUM_RISK_THRESHOLD = float(os.getenv('MEDIUM_RISK_THRESHOLD', '0.6'))
+    LOW_RISK_THRESHOLD = float(os.getenv('LOW_RISK_THRESHOLD', '0.25'))
+    MEDIUM_RISK_THRESHOLD = float(os.getenv('MEDIUM_RISK_THRESHOLD', '0.55'))
     
     # YOLO configuration
     YOLO_MODEL = os.getenv('YOLO_MODEL', 'yolov8m.pt')
@@ -55,3 +58,7 @@ class Config:
     SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
     SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
     NOTIFICATION_EMAIL = os.getenv('NOTIFICATION_EMAIL', '')
+    
+    # Timed alert thresholds
+    LSTM_MEDIUM_ALERT_THRESHOLD = float(os.getenv('LSTM_MEDIUM_ALERT_THRESHOLD', '0.55'))
+    LSTM_HIGH_ALERT_THRESHOLD = float(os.getenv('LSTM_HIGH_ALERT_THRESHOLD', '0.80'))

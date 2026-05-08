@@ -74,6 +74,32 @@ Please take appropriate action immediately.
             print(f"Failed to send email alert: {str(e)}")
             return False
 
+    def send_custom_email_alert(self, target_email, subject, body):
+        """Send a custom email alert to a target email."""
+        if not self.username or not self.password:
+            return False, "SMTP credentials are missing"
+        if not target_email:
+            return False, "No target email configured"
+
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = self.username
+            msg['To'] = target_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+            server.starttls()
+            server.login(self.username, self.password)
+            server.send_message(msg)
+            server.quit()
+
+            print(f"Email alert sent successfully to {target_email}")
+            return True, "Sent via SMTP"
+        except Exception as e:
+            print(f"Email send failed: {str(e)}")
+            return False, f"Email send failed: {str(e)}"
+
 if __name__ == "__main__":
     # Test script
     notifier = Notifier()
