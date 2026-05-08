@@ -5,32 +5,36 @@
 const socket = io('http://localhost:5000');
 
 // ---- State ----
-let areas     = {};   // area_id → { name, cameras: {camera_id → {...}}, personnel: [...] }
-let sessions  = {};   // camera_id → live state
+let areas = {};   // area_id → { name, cameras: {camera_id → {...}}, personnel: [...] }
+let sessions = {};   // camera_id → live state
 let currentLayout = 2;
 
 // Active modal context
-let activeCameraAreaId  = null;
+let activeCameraAreaId = null;
 let activePersonnelAreaId = null;
 
 // ---- DOM ----
-const areaList       = document.getElementById('areaList');
-const mainContent    = document.getElementById('mainContent');
-const emptyState     = document.getElementById('emptyState');
-const connectionBadge= document.getElementById('connectionBadge');
+const areaList = document.getElementById('areaList');
+const areasGrid = document.getElementById('areasGrid');
+const emptyState = document.getElementById('emptyState');
+const connectionBadge = document.getElementById('connectionBadge');
 const connectionText = document.getElementById('connectionText');
-const systemTimeEl   = document.getElementById('systemTime');
-const statAreas      = document.getElementById('statAreas');
-const statFeeds      = document.getElementById('statFeeds');
-const statHigh       = document.getElementById('statHigh');
+const headerTimeEl = document.getElementById('headerTime');
+const statAreas = document.getElementById('statAreas');
+const statFeeds = document.getElementById('statFeeds');
+const statHigh = document.getElementById('statHigh');
+
 
 // ---- Clock ----
 function updateClock() {
     const now = new Date();
-    systemTimeEl.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+    if (headerTimeEl) {
+        headerTimeEl.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+    }
 }
 setInterval(updateClock, 1000);
 updateClock();
+
 
 // ---- Layout ----
 function setLayout(cols) {
@@ -65,11 +69,11 @@ socket.on('frame_data', (data) => {
     if (!sessions[camera_id]) return;
 
     // Update live state
-    sessions[camera_id].risk_level  = data.risk_level;
+    sessions[camera_id].risk_level = data.risk_level;
     sessions[camera_id].crowd_count = data.crowd_count;
-    sessions[camera_id].lstm_score  = data.lstm_score;
-    sessions[camera_id].lstm_level  = data.lstm_level;
-    sessions[camera_id].alerts      = data.alerts || [];
+    sessions[camera_id].lstm_score = data.lstm_score;
+    sessions[camera_id].lstm_level = data.lstm_level;
+    sessions[camera_id].alerts = data.alerts || [];
 
     updateCameraCard(camera_id, data);
     updateAreaSidebarItem(area_id);
@@ -118,7 +122,7 @@ socket.on('area_alert_clear', (data) => {
 
 async function loadAreas() {
     try {
-        const res  = await fetch('/api/areas');
+        const res = await fetch('/api/areas');
         const list = await res.json();
         list.forEach(a => {
             areas[a.id] = { ...a, cameras: {}, personnel: a.personnel || [] };
@@ -129,14 +133,14 @@ async function loadAreas() {
             // Register cameras that already exist in the DB
             (a.cameras || []).forEach(cam => {
                 sessions[cam.session_id] = {
-                    name:        cam.name,
+                    name: cam.name,
                     camera_type: cam.camera_type || 'other',
                     description: cam.description || '',
-                    area_id:     a.id,
-                    risk_level:  cam.risk_level  || 'LOW',
+                    area_id: a.id,
+                    risk_level: cam.risk_level || 'LOW',
                     crowd_count: cam.crowd_count || 0,
-                    processing:  cam.processing  || false,
-                    alerts:      [],
+                    processing: cam.processing || false,
+                    alerts: [],
                 };
                 areas[a.id].cameras[cam.session_id] = sessions[cam.session_id];
                 addCameraCardToArea(a.id, cam.session_id, cam.name, cam.camera_type || 'other', cam.description || '');
@@ -153,17 +157,17 @@ async function loadAreas() {
 // Area CRUD
 // =============================================================
 
-function openAreaModal()  { document.getElementById('areaModal').classList.add('open'); }
+function openAreaModal() { document.getElementById('areaModal').classList.add('open'); }
 function closeAreaModal() { document.getElementById('areaModal').classList.remove('open'); }
 
 async function createArea() {
-    const name     = document.getElementById('areaName').value.trim();
-    const desc     = document.getElementById('areaDesc').value.trim();
+    const name = document.getElementById('areaName').value.trim();
+    const desc = document.getElementById('areaDesc').value.trim();
     const capacity = parseInt(document.getElementById('areaCapacity').value) || 0;
     if (!name) { showToast('Area name is required', 'error'); return; }
 
     try {
-        const res  = await fetch('/api/areas', {
+        const res = await fetch('/api/areas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, description: desc, capacity_limit: capacity })
@@ -181,7 +185,7 @@ async function createArea() {
         showToast(`Area "${area.name}" created`, 'success');
 
         // Clear inputs
-        ['areaName','areaDesc','areaCapacity'].forEach(id => document.getElementById(id).value = '');
+        ['areaName', 'areaDesc', 'areaCapacity'].forEach(id => document.getElementById(id).value = '');
     } catch (e) {
         showToast(`Error: ${e.message}`, 'error');
     }
@@ -191,7 +195,7 @@ async function deleteArea(areaId) {
     if (!confirm('Delete this area and all its cameras?')) return;
     try {
         const res = await fetch(`/api/areas/${areaId}`, { method: 'DELETE' });
-        const d   = await res.json();
+        const d = await res.json();
         if (!res.ok) throw new Error(d.error);
 
         // Remove all camera cards in this area from sessions
@@ -272,11 +276,11 @@ function switchTab(areaId, tab) {
 function openCameraModal(areaId, areaName) {
     activeCameraAreaId = areaId;
     document.getElementById('modalAreaName').textContent = areaName;
-    document.getElementById('camName').value        = '';
+    document.getElementById('camName').value = '';
     document.getElementById('camDescription').value = '';
-    document.getElementById('camType').value        = 'other';
-    document.getElementById('camDropText').textContent   = 'Click or drag video here';
-    document.getElementById('camSubmitBtn').disabled     = true;
+    document.getElementById('camType').value = 'other';
+    document.getElementById('camDropText').textContent = 'Click or drag video here';
+    document.getElementById('camSubmitBtn').disabled = true;
     document.getElementById('camUploadProgress').style.display = 'none';
     document.getElementById('camFileInput').value = '';
     document.getElementById('cameraModal').classList.add('open');
@@ -311,11 +315,11 @@ camDrop.addEventListener('drop', e => {
 });
 
 async function uploadCamera() {
-    const file        = document.getElementById('camFileInput').files[0];
-    const camName     = document.getElementById('camName').value.trim() || file?.name;
-    const camType     = document.getElementById('camType').value;
-    const camDesc     = document.getElementById('camDescription').value.trim();
-    const areaId      = activeCameraAreaId;
+    const file = document.getElementById('camFileInput').files[0];
+    const camName = document.getElementById('camName').value.trim() || file?.name;
+    const camType = document.getElementById('camType').value;
+    const camDesc = document.getElementById('camDescription').value.trim();
+    const areaId = activeCameraAreaId;
     if (!file || !areaId) return;
 
     document.getElementById('camSubmitBtn').disabled = true;
@@ -331,7 +335,7 @@ async function uploadCamera() {
         const form = new FormData();
         form.append('video', file);
         form.append('camera_name', camName);
-        form.append('area_id',     areaId);
+        form.append('area_id', areaId);
         form.append('camera_type', camType);
         form.append('description', camDesc);
 
@@ -373,20 +377,20 @@ async function uploadCamera() {
 // =============================================================
 
 const CAM_TYPE_LABELS = {
-    entry:     'Entry',
-    exit:      'Exit',
-    center:    'Center',
+    entry: 'Entry',
+    exit: 'Exit',
+    center: 'Center',
     perimeter: 'Perimeter',
-    other:     'Other',
+    other: 'Other',
 };
 
 
-function addCameraCardToArea(areaId, cameraId, cameraName, cameraType='other', description='') {
+function addCameraCardToArea(areaId, cameraId, cameraName, cameraType = 'other', description = '') {
     const grid = document.getElementById(`camera-grid-${areaId}`);
     document.getElementById(`no-cams-${areaId}`)?.remove();
 
     const typeLabel = CAM_TYPE_LABELS[cameraType] || '📷 Other';
-    const descHtml  = description ? `<span class="cam-card-desc">${escHtml(description)}</span>` : '';
+    const descHtml = description ? `<span class="cam-card-desc">${escHtml(description)}</span>` : '';
 
     const card = document.createElement('div');
     card.className = 'camera-card risk-LOW';
@@ -443,17 +447,17 @@ function updateCameraCard(cameraId, data) {
     if (badge) { badge.className = `cam-risk-badge ${risk}`; badge.textContent = risk; }
 
     const img = document.getElementById(`feed-${cameraId}`);
-    const ph  = document.getElementById(`placeholder-${cameraId}`);
-    if (img && data.frame) { img.src = 'data:image/jpeg;base64,' + data.frame; img.style.display = 'block'; if(ph) ph.style.display='none'; }
+    const ph = document.getElementById(`placeholder-${cameraId}`);
+    if (img && data.frame) { img.src = 'data:image/jpeg;base64,' + data.frame; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
 
     const ce = document.getElementById(`count-${cameraId}`);
     if (ce) { ce.textContent = data.crowd_count; ce.className = `cam-stat-value v-${risk.toLowerCase()}`; }
 
     const le = document.getElementById(`lstm-${cameraId}`);
-    if (le) le.textContent = `${(data.lstm_score*100).toFixed(1)}%`;
+    if (le) le.textContent = `${(data.lstm_score * 100).toFixed(1)}%`;
 
     const ls = document.getElementById(`lstmStatus-${cameraId}`);
-    if (ls) { ls.textContent = data.lstm_level||'—'; ls.className = `cam-stat-value ${data.lstm_level==='UNSAFE'?'v-high':'v-low'}`; }
+    if (ls) { ls.textContent = data.lstm_level || '—'; ls.className = `cam-stat-value ${data.lstm_level === 'UNSAFE' ? 'v-high' : 'v-low'}`; }
 
     const ae = document.getElementById(`alerts-${cameraId}`);
     if (ae) {
@@ -503,14 +507,14 @@ async function removeCamera(cameraId, areaId) {
 function openPersonnelModal(areaId, areaName) {
     activePersonnelAreaId = areaId;
     document.getElementById('pModalAreaName').textContent = areaName;
-    ['pName','pRole','pEmail','pPhone'].forEach(id => document.getElementById(id).value = '');
+    ['pName', 'pRole', 'pEmail', 'pPhone'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('personnelModal').classList.add('open');
 }
 function closePersonnelModal() { document.getElementById('personnelModal').classList.remove('open'); }
 
 async function addPersonnel() {
-    const name  = document.getElementById('pName').value.trim();
-    const role  = document.getElementById('pRole').value.trim() || 'Security Officer';
+    const name = document.getElementById('pName').value.trim();
+    const role = document.getElementById('pRole').value.trim() || 'Security Officer';
     const email = document.getElementById('pEmail').value.trim();
     const phone = document.getElementById('pPhone').value.trim();
     const areaId = activePersonnelAreaId;
@@ -602,8 +606,8 @@ function updateAreaSidebarItem(areaId) {
     const meta = document.getElementById(`sidebar-meta-${areaId}`);
     const area = areas[areaId];
     if (!meta || !area) return;
-    const camCount  = Object.keys(area.cameras || {}).length;
-    const perCount  = (area.personnel || []).length;
+    const camCount = Object.keys(area.cameras || {}).length;
+    const perCount = (area.personnel || []).length;
     const highCount = Object.values(area.cameras || {}).filter(c => c.risk_level === 'HIGH').length;
     meta.textContent = `${camCount} cameras · ${perCount} personnel${highCount ? ` · ! ${highCount} HIGH` : ''}`;
 }
@@ -621,7 +625,7 @@ function updateGlobalStats() {
     const allSessions = Object.values(sessions);
     statAreas.textContent = Object.keys(areas).length;
     statFeeds.textContent = allSessions.filter(s => s.processing).length;
-    statHigh.textContent  = allSessions.filter(s => s.risk_level === 'HIGH').length;
+    statHigh.textContent = allSessions.filter(s => s.risk_level === 'HIGH').length;
 }
 
 // =============================================================
@@ -637,15 +641,15 @@ function toggleEmptyState() {
 // Toast
 // =============================================================
 
-const TOAST_ICONS = { success:'[S]', error:'[E]', info:'[I]', warning:'[W]' };
+const TOAST_ICONS = { success: '[S]', error: '[E]', info: '[I]', warning: '[W]' };
 function showToast(message, type = 'info') {
 
     const c = document.getElementById('toastContainer');
     const t = document.createElement('div');
     t.className = `toast ${type}`;
-    t.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type]||''}</span><span>${escHtml(message)}</span>`;
+    t.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type] || ''}</span><span>${escHtml(message)}</span>`;
     c.appendChild(t);
-    setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 3500);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
 }
 
 // =============================================================
@@ -654,12 +658,12 @@ function showToast(message, type = 'info') {
 
 function escHtml(s) {
     if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Close modals on background click
-['areaModal','cameraModal','personnelModal'].forEach(id => {
-    document.getElementById(id).addEventListener('click', function(e) {
+['areaModal', 'cameraModal', 'personnelModal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function (e) {
         if (e.target === this) this.classList.remove('open');
     });
 });

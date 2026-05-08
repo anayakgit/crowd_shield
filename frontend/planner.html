@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrowdShield Planner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .planner-container { display: grid; grid-template-columns: 320px 1fr; gap: 20px; height: calc(100vh - 40px); }
+        .planner-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .canvas-area { background: #f8f9fa; border-radius: 12px; border: 2px dashed #ddd; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #auditCanvas { background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,0.1); cursor: crosshair; }
+        
+        .tool-btn { 
+            display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; 
+            margin-bottom: 10px; border: 1px solid #eee; border-radius: 8px; background: white;
+            cursor: pointer; font-family: inherit; font-size: 0.9rem; transition: all 0.2s;
+        }
+        .tool-btn:hover { background: #f0f0f0; border-color: #ccc; }
+        .tool-btn.active { background: #000; color: #fff; border-color: #000; }
+        
+        .audit-results { margin-top: 20px; padding: 15px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid #007bff; font-size: 0.85rem; line-height: 1.5; }
+        .audit-results h4 { margin-top: 0; color: #0056b3; }
+        
+        .obj-label { position: absolute; font-size: 0.7rem; font-weight: 700; color: #fff; pointer-events: none; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-icon">C</span>
+            <div>
+                <span class="logo-title">CrowdShield</span>
+                <span class="logo-sub">AI Safety System</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item-link" id="navDash"># Dashboard</a>
+            <a href="/planner.html" class="nav-item-link active" id="navPlan"># Safety Planner</a>
+        </nav>
+
+        <div class="sidebar-section" style="margin-top: auto;">
+            <div class="section-label">Design & Simulation</div>
+            <button class="tool-btn active" id="toolSelect" onclick="setTool('select')"><span>^</span> Selection Tool</button>
+            <button class="tool-btn" id="toolEntry" onclick="setTool('entry')"><span>+</span> Entry Point</button>
+            <button class="tool-btn" id="toolExit" onclick="setTool('exit')"><span>+</span> Exit Point</button>
+            <button class="tool-btn" id="toolCamera" onclick="setTool('camera')"><span>+</span> AI Camera</button>
+            <button class="tool-btn" id="toolSource" onclick="setTool('source')" style="color: #f1c40f;"><span>○</span> Crowd Source</button>
+            <button class="tool-btn" id="toolZone" onclick="setTool('zone')" style="color: #9b59b6;"><span>□</span> Monitoring Zone</button>
+        </div>
+
+    </aside>
+
+    <main class="main-content">
+        <header class="main-header">
+            <div class="header-left">
+                <h1>Safety Planner</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn-primary" onclick="runAiAudit()">Run AI Audit</button>
+                <button class="btn-secondary" onclick="startSimulation()">Stress Test</button>
+            </div>
+        </header>
+
+        <div class="canvas-area-container" style="flex: 1; padding: 20px; overflow: hidden;">
+            <div style="margin-bottom: 20px; display: flex; gap: 20px; background: #fff; padding: 15px; border-radius: 12px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" style="font-size: 0.7rem;">Width (m)</label>
+                    <input type="number" id="vWidth" class="form-input" value="40" style="width: 80px;">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" style="font-size: 0.7rem;">Height (m)</label>
+                    <input type="number" id="vHeight" class="form-input" value="20" style="width: 80px;">
+                </div>
+                <div id="auditStatus" style="font-size: 0.8rem; color: #666; align-self: center; font-style: italic;"></div>
+            </div>
+            
+            <div class="canvas-area" style="height: calc(100% - 100px); background: #f8f9fa; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
+                <canvas id="auditCanvas" style="box-shadow: 0 10px 40px rgba(0,0,0,0.1);"></canvas>
+            </div>
+        </div>
+
+        <!-- Audit Results Panel (Sliding or Sidebar) -->
+        <div id="auditBox" style="position: absolute; right: 20px; top: 100px; width: 300px; display: none;">
+            <div class="audit-results">
+                <h4>Audit Report</h4>
+                <div id="auditText" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+
+<script src="js/planner.js"></script>
+</body>
+</html>

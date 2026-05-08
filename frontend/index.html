@@ -4,170 +4,175 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CrowdShield — Area-Based Monitoring</title>
-    <meta name="description" content="AI crowd safety monitoring with multi-area, multi-camera support.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- ===== SIDEBAR ===== -->
-<aside class="sidebar">
-    <div class="sidebar-logo">
-        <span class="logo-icon">C</span>
-        <div>
-            <span class="logo-title">CrowdShield</span>
-            <span class="logo-sub">AI Safety System</span>
-        </div>
-    </div>
-
-    <div class="sidebar-section">
-        <div class="section-label">System</div>
-        <div class="connection-badge" id="connectionBadge">
-            <span class="badge-dot"></span>
-            <span id="connectionText">Connecting…</span>
-        </div>
-    </div>
-
-    <div class="sidebar-section" style="flex:1; overflow-y:auto;">
-        <div class="section-label-row">
-            <span class="section-label">Areas</span>
-            <button class="btn-inline" onclick="openAreaModal()">+ New Area</button>
-        </div>
-        <div id="areaList"><div class="no-items">No areas yet</div></div>
-    </div>
-
-    <div class="sidebar-footer">
-        <div class="stat-row"><span class="stat-label">Areas</span><span class="stat-val" id="statAreas">0</span></div>
-        <div class="stat-row"><span class="stat-label">Active Feeds</span><span class="stat-val" id="statFeeds">0</span></div>
-        <div class="stat-row"><span class="stat-label">HIGH Risk</span><span class="stat-val" id="statHigh">0</span></div>
-    </div>
-</aside>
-
-<!-- ===== MAIN ===== -->
-<main class="main-content">
-    <header class="topbar">
-        <div class="topbar-left">
-            <h1 class="topbar-title">Live Monitoring</h1>
-            <span class="topbar-time" id="systemTime"></span>
-        </div>
-        <div class="topbar-right">
-            <div class="layout-toggle">
-                <button class="layout-btn" id="layout1" onclick="setLayout(1)">1</button>
-                <button class="layout-btn active" id="layout2" onclick="setLayout(2)">2</button>
-                <button class="layout-btn" id="layout3" onclick="setLayout(3)">3</button>
+<div class="app-container">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-icon">C</span>
+            <div>
+                <span class="logo-title">CrowdShield</span>
+                <span class="logo-sub">AI Safety System</span>
             </div>
         </div>
-    </header>
 
-    <div id="mainContent">
-        <div class="empty-state" id="emptyState">
-            <div class="empty-icon">#</div>
-            <h2>No Areas Added</h2>
-            <p>Create an area first, then add cameras to start monitoring.</p>
-            <button class="btn-primary" onclick="openAreaModal()">Create First Area</button>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item-link active" id="navDash"># Dashboard</a>
+            <a href="/planner.html" class="nav-item-link" id="navPlan"># Safety Planner</a>
+        </nav>
+
+        <div class="sidebar-section">
+            <div class="section-label">System</div>
+            <div class="connection-badge" id="connectionBadge">
+                <span class="badge-dot"></span>
+                <span id="connectionText">Connecting…</span>
+            </div>
         </div>
-    </div>
-</main>
 
-<!-- ===== MODAL: New Area ===== -->
-<div class="modal-overlay" id="areaModal">
-    <div class="modal">
+        <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+            <div class="section-label-row">
+                <span class="section-label">Areas</span>
+                <button class="btn-inline" onclick="openAreaModal()">+ New Area</button>
+            </div>
+            <div id="areaList">
+                <div class="no-items">No areas yet</div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="stat-row"><span class="stat-label">Areas</span><span class="stat-val" id="statAreas">0</span></div>
+            <div class="stat-row"><span class="stat-label">Active Feeds</span><span class="stat-val" id="statFeeds">0</span></div>
+            <div class="stat-row"><span class="stat-label">HIGH Risk</span><span class="stat-val" id="statHigh">0</span></div>
+        </div>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+        <header class="main-header">
+            <div class="header-left">
+                <h1>Live Monitoring</h1>
+            </div>
+            <div class="header-right">
+                <span id="headerTime" style="font-size: 0.8rem; color: #666;"></span>
+            </div>
+        </header>
+
+        <div id="dashboardView" style="padding: 24px; flex: 1; overflow-y: auto;">
+            <div id="areasGrid" class="areas-grid">
+                <!-- Areas injected by JS -->
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">🛡️</div>
+                <h3>No areas monitored</h3>
+                <p>Add your first campus area from the sidebar to begin monitoring.</p>
+                <button class="btn-primary" onclick="openAreaModal()" style="margin-top: 20px;">Add Area</button>
+            </div>
+        </div>
+
+        <div id="toastContainer" class="toast-container"></div>
+    </main>
+</div>
+
+<!-- Modals -->
+<div id="areaModal" class="modal-overlay">
+    <div class="modal-card">
         <div class="modal-header">
-            <h2>New Monitoring Area</h2>
-            <button class="modal-close" onclick="closeAreaModal()">✕</button>
+            <h3>Add New Area</h3>
+            <button class="modal-close" onclick="closeAreaModal()">×</button>
         </div>
         <div class="modal-body">
-            <label class="form-label">Area Name *</label>
-            <input class="form-input" id="areaName" type="text" placeholder="e.g. North Gate, Sheep Pen A">
-
-            <label class="form-label" style="margin-top:14px;">Description</label>
-            <input class="form-input" id="areaDesc" type="text" placeholder="Optional description">
-
-            <label class="form-label" style="margin-top:14px;">Capacity Limit</label>
-            <input class="form-input" id="areaCapacity" type="number" min="0" placeholder="Max people (0 = unlimited)">
-        </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeAreaModal()">Cancel</button>
-            <button class="btn-primary" onclick="createArea()">Create Area</button>
+            <div class="form-group">
+                <label class="form-label">Area Name</label>
+                <input type="text" id="areaName" class="form-input" placeholder="e.g. Main Hall">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" id="areaDesc" class="form-input" placeholder="Optional details...">
+            </div>
+            <button class="btn-primary" style="width: 100%; margin-top: 10px;" onclick="createArea()">Create Area</button>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL: Add Camera ===== -->
-<div class="modal-overlay" id="cameraModal">
-    <div class="modal">
+<div id="cameraModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
         <div class="modal-header">
-            <h2>Add Camera to <span id="modalAreaName">Area</span></h2>
-            <button class="modal-close" onclick="closeCameraModal()">✕</button>
+            <h3>Add Camera to <span id="modalAreaName">...</span></h3>
+            <button class="modal-close" onclick="closeCameraModal()">×</button>
+        </div>
+        <div class="modal-tabs">
+            <button class="m-tab-btn active" id="tabBtnFile" onclick="setCamMode('file')">Video File</button>
+            <button class="m-tab-btn" id="tabBtnLive" onclick="setCamMode('live')">Live Feed</button>
         </div>
         <div class="modal-body">
-            <label class="form-label">Camera Name *</label>
-            <input class="form-input" id="camName" type="text" placeholder="e.g. Entrance Cam 1">
-
-            <label class="form-label" style="margin-top:14px;">Camera Type</label>
-            <select class="form-input" id="camType">
-                <option value="entry">Entry — People flowing in</option>
-                <option value="exit">Exit — People flowing out</option>
-                <option value="center">Center — Middle of area</option>
-                <option value="perimeter">Perimeter — Boundary / edge</option>
-                <option value="other" selected>Other</option>
-            </select>
-
-            <label class="form-label" style="margin-top:14px;">Description</label>
-            <input class="form-input" id="camDescription" type="text" placeholder="e.g. Facing main gate, left side">
-
-            <label class="form-label" style="margin-top:14px;">Upload Video</label>
-            <div class="file-drop-zone" id="camDropZone" onclick="document.getElementById('camFileInput').click()">
-                <div class="drop-icon">V</div>
-                <div class="drop-text" id="camDropText">Click or drag video here</div>
-                <div class="drop-hint">MP4, AVI, MOV — up to 500 MB</div>
+            <div id="camModeFile">
+                <div class="file-drop-zone" id="camDropZone">
+                    <input type="file" id="camFileInput" accept="video/*" hidden>
+                    <p id="camDropText">Click or drag video here</p>
+                </div>
             </div>
-            <input type="file" id="camFileInput" accept="video/*" style="display:none;">
-
-            <div id="camUploadProgress" style="display:none; margin-top:12px;">
-                <div class="progress-bar-track"><div class="progress-bar-fill" id="camProgressFill"></div></div>
-                <span class="progress-label" id="camProgressLabel">Uploading…</span>
+            <div id="camModeLive" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Source URL / Index</label>
+                    <input type="text" id="camSourceUrl" class="form-input" placeholder="e.g. 0 or rtsp://...">
+                    <p class="form-hint">Enter '0' for webcam, or an RTSP URL.</p>
+                </div>
             </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeCameraModal()">Cancel</button>
-            <button class="btn-primary" id="camSubmitBtn" onclick="uploadCamera()" disabled>Start Monitoring</button>
+            <div class="form-group" style="margin-top: 15px;">
+                <label class="form-label">Camera Name</label>
+                <input type="text" id="camName" class="form-input" placeholder="e.g. Entrance A">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select id="camType" class="form-input">
+                        <option value="entry">Entry/Exit</option>
+                        <option value="center">Center</option>
+                        <option value="other" selected>Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="camDescription" class="form-input" placeholder="Building 1, etc.">
+                </div>
+            </div>
+            <div id="camUploadProgress" style="display:none; margin-top:15px;">
+                <div class="progress-bar"><div class="progress-fill" id="camProgressFill"></div></div>
+            </div>
+            <button class="btn-primary" id="camSubmitBtn" style="width: 100%; margin-top: 15px;" onclick="uploadCamera()" disabled>Start Monitor</button>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL: Add Personnel ===== -->
-<div class="modal-overlay" id="personnelModal">
-    <div class="modal">
+<div id="personnelModal" class="modal-overlay">
+    <div class="modal-card">
         <div class="modal-header">
-            <h2>Add Personnel to <span id="pModalAreaName">Area</span></h2>
-            <button class="modal-close" onclick="closePersonnelModal()">✕</button>
+            <h3>Assign Personnel</h3>
+            <button class="modal-close" onclick="closePersonnelModal()">×</button>
         </div>
         <div class="modal-body">
-            <label class="form-label">Full Name *</label>
-            <input class="form-input" id="pName" type="text" placeholder="e.g. Ravi Kumar">
-
-            <label class="form-label" style="margin-top:14px;">Role</label>
-            <input class="form-input" id="pRole" type="text" placeholder="e.g. Security Officer, Supervisor">
-
-            <label class="form-label" style="margin-top:14px;">Email</label>
-            <input class="form-input" id="pEmail" type="email" placeholder="e.g. ravi@example.com">
-
-            <label class="form-label" style="margin-top:14px;">Phone</label>
-            <input class="form-input" id="pPhone" type="tel" placeholder="e.g. +91 98765 43210">
-        </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closePersonnelModal()">Cancel</button>
-            <button class="btn-primary" onclick="addPersonnel()">Add Personnel</button>
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" id="personName" class="form-input" placeholder="e.g. Officer Smith">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Contact Method</label>
+                <select id="personContact" class="form-input">
+                    <option value="radio">Radio</option>
+                    <option value="mobile">Mobile</option>
+                </select>
+            </div>
+            <button class="btn-primary" style="width: 100%; margin-top: 10px;" onclick="addPersonnel()">Assign</button>
         </div>
     </div>
 </div>
 
-<!-- Toasts -->
-<div class="toast-container" id="toastContainer"></div>
-
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

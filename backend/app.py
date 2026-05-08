@@ -221,8 +221,9 @@ def update_area(area_id):
     data = request.get_json(silent=True) or {}
     db = db_session()
     try:
-        area = db.query(Area).get(area_id)
+        area = db.get(Area, area_id)
         if not area:
+
             return jsonify({'error': 'Area not found'}), 404
         if 'name'           in data: area.name           = data['name']
         if 'description'    in data: area.description    = data['description']
@@ -240,8 +241,9 @@ def update_area(area_id):
 def delete_area(area_id):
     db = db_session()
     try:
-        area = db.query(Area).get(area_id)
+        area = db.get(Area, area_id)
         if not area:
+
             return jsonify({'error': 'Area not found'}), 404
         # Stop all running sessions for cameras in this area
         for cam in area.cameras:
@@ -298,8 +300,9 @@ def create_personnel():
 def delete_personnel(person_id):
     db = db_session()
     try:
-        person = db.query(Personnel).get(person_id)
+        person = db.get(Personnel, person_id)
         if not person:
+
             return jsonify({'error': 'Personnel not found'}), 404
         db.delete(person)
         db.commit()
@@ -318,9 +321,10 @@ def assign_personnel(area_id):
     person_id = data.get('personnel_id')
     db = db_session()
     try:
-        area   = db.query(Area).get(area_id)
-        person = db.query(Personnel).get(person_id)
+        area   = db.get(Area, area_id)
+        person = db.get(Personnel, person_id)
         if not area:
+
             return jsonify({'error': 'Area not found'}), 404
         if not person:
             return jsonify({'error': 'Personnel not found'}), 404
@@ -340,9 +344,10 @@ def unassign_personnel(area_id, person_id):
     """Remove a personnel member from an area."""
     db = db_session()
     try:
-        area   = db.query(Area).get(area_id)
-        person = db.query(Personnel).get(person_id)
+        area   = db.get(Area, area_id)
+        person = db.get(Personnel, person_id)
         if not area or not person:
+
             return jsonify({'error': 'Not found'}), 404
         if person in area.personnel:
             area.personnel.remove(person)
@@ -377,8 +382,9 @@ def upload_video():
 
     db = db_session()
     try:
-        area = db.query(Area).get(area_id)
+        area = db.get(Area, area_id)
         if not area:
+
             return jsonify({'error': 'Area not found'}), 404
 
         # Generate unique session ID
@@ -463,6 +469,26 @@ def get_status():
             'crowd_count': st['crowd_count'],
         }
     return jsonify(result)
+
+# ============================================================
+# ROUTES — Planner
+# ============================================================
+
+@app.route('/api/planner/audit', methods=['POST'])
+def planner_audit():
+    data = request.get_json(silent=True) or {}
+    dimensions = data.get('dimensions', {'width': 40, 'height': 20})
+    exits      = data.get('exits', [])
+    cameras    = data.get('cameras', [])
+    
+    # Initialize advisor if not already
+    global notifier # unrelated but using global pattern
+    from backend.utils.llm_advisor import LLMAdvisor
+    advisor = LLMAdvisor()
+    
+    report = advisor.run_safety_audit(dimensions, exits, cameras)
+    return jsonify({'report': report})
+
 
 # ============================================================
 # SocketIO
