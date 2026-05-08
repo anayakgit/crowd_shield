@@ -35,6 +35,28 @@ body {
     z-index: 100;
 }
 
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 12px;
+}
+
+.nav-item-link {
+    display: block;
+    padding: 7px 10px;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #333;
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: background 0.15s;
+}
+.nav-item-link:hover { background: #f0f0f0; color: #000; }
+.nav-item-link.active { background: #000; color: #fff; }
+
 .sidebar-logo {
     display: flex;
     align-items: center;

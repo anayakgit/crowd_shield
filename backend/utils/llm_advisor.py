@@ -8,7 +8,7 @@ class LLMAdvisor:
         if Config.GEMINI_API_KEY:
             # Using the new google-genai SDK
             self.client = genai.Client(api_key=Config.GEMINI_API_KEY)
-            self.model_id = 'gemini-1.5-flash' # or gemini-2.0-flash when available
+            self.model_id = 'gemini-2.0-flash' 
             self.enabled = True
         else:
             self.enabled = False
