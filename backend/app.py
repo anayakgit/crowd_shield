@@ -254,6 +254,36 @@ def delete_area(area_id):
     except Exception as e:
         db.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/areas/<int:area_id>/alert', methods=['POST'])
+def send_manual_alert(area_id):
+    db = db_session()
+    try:
+        area = db.get(Area, area_id)
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+        
+        area_cameras = {cid: s for cid, s in sessions.items() if s['area_id'] == area_id}
+        max_risk = 'MANUAL'
+        crowd_count = 0
+        for s in area_cameras.values():
+            r = s['state']['risk_level']
+            if r == 'HIGH':
+                max_risk = 'HIGH'
+            elif r == 'MEDIUM' and max_risk != 'HIGH':
+                max_risk = 'MEDIUM'
+            crowd_count += s['state']['crowd_count']
+            
+        alerts = [{'action': 'Check immediately', 'message': f'Manual alert triggered by user for area: {area.name}'}]
+        
+        success = notifier.send_email_alert(max_risk, crowd_count, alerts, manual=True)
+        if success:
+            return jsonify({'message': 'Alert sent successfully'})
+        else:
+            return jsonify({'error': 'Failed to send alert. Check SMTP config.'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 

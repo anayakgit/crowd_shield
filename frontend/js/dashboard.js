@@ -239,6 +239,7 @@ function renderAreaSection(areaId, area) {
             <div class="area-header-right">
                 <button class="btn-sm" onclick="openPersonnelModal(${areaId}, '${escHtml(area.name)}')">+ Personnel</button>
                 <button class="btn-sm primary" onclick="openCameraModal(${areaId}, '${escHtml(area.name)}')">+ Camera</button>
+                <button class="btn-sm" style="background: #ff9800; color: white; border: none;" onclick="sendManualAlert(${areaId})">Send Alert</button>
                 <button class="btn-sm danger" onclick="deleteArea(${areaId})">Delete Area</button>
             </div>
         </div>
@@ -697,6 +698,22 @@ function clearAreaEscalationBanner(areaId) {
     if (!section) return;
     section.querySelector('.area-escalation-banner')?.remove();
     section.classList.remove('area-escalated');
+}
+
+// =============================================================
+// Manual Alerts
+// =============================================================
+
+async function sendManualAlert(areaId) {
+    if (!confirm('Are you sure you want to send a manual email alert to authorities?')) return;
+    try {
+        const res = await fetch(`/api/areas/${areaId}/alert`, { method: 'POST' });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error);
+        showToast('Manual alert sent successfully', 'success');
+    } catch (e) {
+        showToast(`Failed to send alert: ${e.message}`, 'error');
+    }
 }
 
 // ---- Init ----
