@@ -12,6 +12,7 @@ let currentLayout = 2;
 // Active modal context
 let activeCameraAreaId = null;
 let activePersonnelAreaId = null;
+let camSourceMode = 'video'; // 'video' | 'webcam'
 
 // ---- DOM ----
 const areaList = document.getElementById('areaList');
@@ -284,9 +285,36 @@ function openCameraModal(areaId, areaName) {
     document.getElementById('camSubmitBtn').disabled = true;
     document.getElementById('camUploadProgress').style.display = 'none';
     document.getElementById('camFileInput').value = '';
+    document.getElementById('camYoutubeUrl').value = '';
+    switchCamTab('video'); // always reset to video tab
     document.getElementById('cameraModal').classList.add('open');
 }
 function closeCameraModal() { document.getElementById('cameraModal').classList.remove('open'); }
+
+function switchCamTab(mode) {
+    camSourceMode = mode;
+    document.getElementById('camPanelVideo').style.display   = mode === 'video'  ? 'block' : 'none';
+    document.getElementById('camPanelWebcam').style.display  = mode === 'webcam' ? 'block' : 'none';
+    document.getElementById('tabBtnVideo').classList.toggle('active',  mode === 'video');
+    document.getElementById('tabBtnWebcam').classList.toggle('active', mode === 'webcam');
+    // Enable submit only when relevant input is ready
+    if (mode === 'webcam') {
+        const hasUrl = !!document.getElementById('camYoutubeUrl').value.trim();
+        document.getElementById('camSubmitBtn').disabled = !hasUrl;
+    } else {
+        const hasFile = !!document.getElementById('camFileInput').files[0];
+        document.getElementById('camSubmitBtn').disabled = !hasFile;
+    }
+}
+
+/** Unified submit — dispatches based on active tab */
+function submitCamera() {
+    if (camSourceMode === 'webcam') {
+        startWebcam();
+    } else {
+        uploadCamera();
+    }
+}
 
 document.getElementById('camFileInput').addEventListener('change', () => {
     const file = document.getElementById('camFileInput').files[0];
@@ -295,6 +323,25 @@ document.getElementById('camFileInput').addEventListener('change', () => {
         if (!document.getElementById('camName').value)
             document.getElementById('camName').value = file.name.replace(/\.[^/.]+$/, '');
         document.getElementById('camSubmitBtn').disabled = false;
+    }
+});
+
+document.getElementById('camYoutubeUrl').addEventListener('input', (e) => {
+    if (camSourceMode === 'webcam') {
+        document.getElementById('camSubmitBtn').disabled = !e.target.value.trim();
+        // optionally auto-fill name if not set
+        if (e.target.value.trim() && !document.getElementById('camName').value) {
+            document.getElementById('camName').value = 'Live Camera Feed';
+        }
+    }
+});
+
+document.getElementById('camYoutubeUrl').addEventListener('change', (e) => {
+    if (camSourceMode === 'webcam') {
+        document.getElementById('camSubmitBtn').disabled = !e.target.value.trim();
+        if (e.target.value.trim() && !document.getElementById('camName').value) {
+            document.getElementById('camName').value = 'Live Camera Feed';
+        }
     }
 });
 
@@ -314,6 +361,59 @@ camDrop.addEventListener('drop', e => {
         document.getElementById('camSubmitBtn').disabled = false;
     }
 });
+
+async function startWebcam() {
+    const camName      = document.getElementById('camName').value.trim() || 'Live Feed';
+    const camType      = document.getElementById('camType').value;
+    const camDesc      = document.getElementById('camDescription').value.trim();
+    const areaId       = activeCameraAreaId;
+    const youtubeUrl   = document.getElementById('camYoutubeUrl').value.trim();
+
+    if (!areaId) return;
+    if (!youtubeUrl) { showToast('Please enter a YouTube or stream URL', 'error'); return; }
+
+    document.getElementById('camSubmitBtn').disabled = true;
+    document.getElementById('camSubmitBtn').textContent = 'Resolving stream…';
+
+    try {
+        const res = await fetch('/api/start_webcam', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                area_id:      areaId,
+                camera_name:  camName,
+                camera_type:  camType,
+                description:  camDesc,
+                youtube_url:  youtubeUrl,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        const { camera_id, area_name, camera_type, description } = data;
+
+        sessions[camera_id] = {
+            name: camName, camera_type: camera_type || camType,
+            description: description || camDesc,
+            area_id: areaId,
+            risk_level: 'LOW', crowd_count: 0,
+            processing: true, alerts: []
+        };
+        areas[areaId].cameras[camera_id] = sessions[camera_id];
+
+        closeCameraModal();
+        addCameraCardToArea(areaId, camera_id, camName, camera_type || camType, description || camDesc);
+        updateAreaSidebarItem(areaId);
+        updateGlobalStats();
+        showToast(`📺 Live feed "${camName}" connected in ${area_name}`, 'success');
+
+        socket.emit('start_stream', { camera_id });
+    } catch (e) {
+        showToast(`Live feed error: ${e.message}`, 'error');
+        document.getElementById('camSubmitBtn').disabled = false;
+        document.getElementById('camSubmitBtn').textContent = 'Start Monitoring';
+    }
+}
 
 async function uploadCamera() {
     const file = document.getElementById('camFileInput').files[0];

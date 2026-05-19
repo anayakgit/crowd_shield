@@ -39,26 +39,103 @@ class VideoProcessor:
         }
     
     def open_webcam(self, camera_index=0):
-        """Open webcam for live processing"""
-        self.current_source = cv2.VideoCapture(camera_index)
+        """Open webcam for live processing (tries AVFoundation on macOS first)."""
+        import platform
+
+        backends_to_try = []
+        if platform.system() == 'Darwin':
+            backends_to_try.append(cv2.CAP_AVFOUNDATION)
+        backends_to_try.append(cv2.CAP_ANY)  # default / auto-detect
+
+        cap = None
+        for backend in backends_to_try:
+            try:
+                c = cv2.VideoCapture(camera_index, backend)
+                if c.isOpened():
+                    # Do a test read — on macOS, isOpened() can return True
+                    # even when camera permission has been denied.
+                    ret, _ = c.read()
+                    if ret:
+                        cap = c
+                        break
+                    else:
+                        c.release()
+                else:
+                    c.release()
+            except Exception:
+                pass
+
+        if cap is None:
+            raise ValueError(
+                f"Failed to open webcam at index {camera_index}. "
+                "On macOS, make sure Terminal (or your IDE) has Camera access "
+                "in System Settings → Privacy & Security → Camera."
+            )
+
+        self.current_source = cap
         self.is_webcam = True
-        
-        if not self.current_source.isOpened():
-            raise ValueError(f"Failed to open webcam at index {camera_index}")
-        
-        # Set webcam properties for better performance
+
+        # Set resolution
         self.current_source.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.current_source.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        
-        width = int(self.current_source.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        width  = int(self.current_source.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.current_source.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        
+
         return {
-            'width': width,
-            'height': height,
-            'is_webcam': True
+            'width':     width,
+            'height':    height,
+            'is_webcam': True,
         }
-    
+
+    def open_stream_url(self, url):
+        """Open a YouTube URL or any RTSP/HTTP stream via yt-dlp / cv2."""
+        stream_url = url
+
+        # If it looks like a YouTube URL, resolve the actual stream URL
+        if 'youtube.com' in url or 'youtu.be' in url:
+            try:
+                import yt_dlp
+                ydl_opts = {
+                    'format': 'best[ext=mp4]/best',
+                    'quiet':  True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    stream_url = info['url']
+                    print(f"[stream] Resolved YouTube URL -> {stream_url[:80]}...")
+            except ImportError:
+                raise ValueError("yt-dlp is not installed. Run: pip install yt-dlp")
+            except Exception as e:
+                raise ValueError(f"Failed to resolve YouTube stream: {e}")
+
+        cap = cv2.VideoCapture(stream_url)
+        if not cap.isOpened():
+            raise ValueError(f"Failed to open stream: {url}")
+
+        # Quick read test
+        ret, _ = cap.read()
+        if not ret:
+            cap.release()
+            raise ValueError(f"Stream opened but produced no frames: {url}")
+
+        # Seek back to start for video-on-demand streams
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+        self.current_source = cap
+        self.is_webcam       = False
+
+        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps    = cap.get(cv2.CAP_PROP_FPS)
+
+        return {
+            'width':      width,
+            'height':     height,
+            'fps':        fps,
+            'stream_url': stream_url[:120],
+        }
+
     def read_frame(self):
         """Read next frame from current source"""
         if self.current_source is None:

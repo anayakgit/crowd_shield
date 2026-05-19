@@ -122,22 +122,52 @@
             <label class="form-label" style="margin-top:14px;">Description</label>
             <input class="form-input" id="camDescription" type="text" placeholder="e.g. Facing main gate, left side">
 
-            <label class="form-label" style="margin-top:14px;">Upload Video</label>
-            <div class="file-drop-zone" id="camDropZone" onclick="document.getElementById('camFileInput').click()">
-                <div class="drop-icon">V</div>
-                <div class="drop-text" id="camDropText">Click or drag video here</div>
-                <div class="drop-hint">MP4, AVI, MOV — up to 500 MB</div>
+            <!-- Source tabs -->
+            <div class="cam-source-tabs" style="margin-top:18px;">
+                <button class="cam-tab-btn active" id="tabBtnVideo" onclick="switchCamTab('video')">📁 Upload Video</button>
+                <button class="cam-tab-btn" id="tabBtnWebcam" onclick="switchCamTab('webcam')">🔴 Live Feed</button>
             </div>
-            <input type="file" id="camFileInput" accept="video/*" style="display:none;">
 
-            <div id="camUploadProgress" style="display:none; margin-top:12px;">
-                <div class="progress-bar-track"><div class="progress-bar-fill" id="camProgressFill"></div></div>
-                <span class="progress-label" id="camProgressLabel">Uploading…</span>
+            <!-- Upload panel -->
+            <div id="camPanelVideo" style="margin-top:12px;">
+                <div class="file-drop-zone" id="camDropZone" onclick="document.getElementById('camFileInput').click()">
+                    <div class="drop-icon">V</div>
+                    <div class="drop-text" id="camDropText">Click or drag video here</div>
+                    <div class="drop-hint">MP4, AVI, MOV — up to 500 MB</div>
+                </div>
+                <input type="file" id="camFileInput" accept="video/*" style="display:none;">
+
+                <div id="camUploadProgress" style="display:none; margin-top:12px;">
+                    <div class="progress-bar-track"><div class="progress-bar-fill" id="camProgressFill"></div></div>
+                    <span class="progress-label" id="camProgressLabel">Uploading…</span>
+                </div>
+            </div>
+
+            <!-- Live Feed (YouTube/Stream URL) panel -->
+            <div id="camPanelWebcam" style="display:none; margin-top:12px;">
+                <div class="webcam-info-box">
+                    <div class="webcam-pulse-dot"></div>
+                    <div>
+                        <div style="font-weight:600; font-size:0.95rem;">CCTV Cloud Streams</div>
+                        <div style="font-size:0.8rem; opacity:0.7; margin-top:2px;">Live monitoring feeds — processed in real-time by the AI engine</div>
+                    </div>
+                </div>
+                <label class="form-label" style="margin-top:14px;">Select Camera Feed *</label>
+                <select class="form-input" id="camYoutubeUrl">
+                    <option value="">-- Choose a Live Camera Feed --</option>
+                    <option value="https://www.youtube.com/watch?v=VR-x3HdhKLQ">Bondi Aussie Bar, Koh Samui</option>
+                    <option value="https://www.youtube.com/watch?v=M3EYAY2MftI">Abbey Road Crossing, London</option>
+                    <option value="https://www.youtube.com/watch?v=3nyPER2kzqk">Dublin City, Ireland</option>
+                    <option value="https://www.youtube.com/watch?v=6MMXJrzT5c0">Henry Africa's Bar, Koh Samui</option>
+                    <option value="https://www.youtube.com/watch?v=OkQ0utdxwBY">Bangkok Walking Tour (Bodycam)</option>
+                    <option value="https://www.youtube.com/watch?v=UemFRPrl1hk">Sukhumvit Road, Bangkok</option>
+                    <option value="https://www.youtube.com/watch?v=WKGK_hYnlGE">London Street Walk (Bodycam)</option>
+                </select>
             </div>
         </div>
         <div class="modal-footer">
             <button class="btn-secondary" onclick="closeCameraModal()">Cancel</button>
-            <button class="btn-primary" id="camSubmitBtn" onclick="uploadCamera()" disabled>Start Monitoring</button>
+            <button class="btn-primary" id="camSubmitBtn" onclick="submitCamera()" disabled>Start Monitoring</button>
         </div>
     </div>
 </div>

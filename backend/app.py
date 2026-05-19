@@ -463,6 +463,70 @@ def upload_video():
         db.close()
 
 
+@app.route('/api/start_webcam', methods=['POST'])
+def start_webcam():
+    """Start a live feed — YouTube/RTSP URL or local webcam index."""
+    data         = request.get_json(silent=True) or {}
+    area_id      = data.get('area_id')
+    camera_name  = (data.get('camera_name') or 'Live Feed').strip()
+    camera_type  = data.get('camera_type', 'other')
+    description  = data.get('description', '')
+    youtube_url  = (data.get('youtube_url') or '').strip()
+    camera_index = int(data.get('camera_index', 0))
+
+    if not area_id:
+        return jsonify({'error': 'area_id is required'}), 400
+
+    db = db_session()
+    try:
+        area = db.get(Area, area_id)
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+        camera_id    = f"cam_{str(uuid.uuid4())[:8]}"
+        filepath_tag = youtube_url if youtube_url else f'webcam:{camera_index}'
+
+        cam_record = Camera(
+            area_id     = area_id,
+            session_id  = camera_id,
+            name        = camera_name,
+            camera_type = camera_type,
+            description = description,
+            filepath    = filepath_tag,
+        )
+        db.add(cam_record)
+        db.commit()
+
+        session = create_session(camera_id, camera_name, area_id, camera_type, description)
+
+        if youtube_url:
+            stream_info = session['components']['video_processor'].open_stream_url(youtube_url)
+        else:
+            stream_info = session['components']['video_processor'].open_webcam(camera_index)
+
+        session['state']['source_type'] = 'webcam'  # retry-mode, never auto-stops
+        session['state']['processing']  = True
+
+        source_label = youtube_url if youtube_url else f'webcam:{camera_index}'
+        print(f"Live feed started -> [{area.name}] {camera_id} ({camera_name}) @ {source_label}")
+        return jsonify({
+            'message':     'Live feed started successfully',
+            'camera_id':   camera_id,
+            'camera_name': camera_name,
+            'camera_type': camera_type,
+            'description': description,
+            'area_id':     area_id,
+            'area_name':   area.name,
+            'stream_info': stream_info,
+        })
+    except Exception as e:
+        db.rollback()
+        delete_session(camera_id) if 'camera_id' in locals() else None
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
 @app.route('/api/remove_camera', methods=['POST'])
 def remove_camera():
     data      = request.get_json(silent=True) or {}
@@ -531,9 +595,8 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('Client disconnected — stopping all sessions')
-    for cam_id in list(sessions.keys()):
-        stop_session(cam_id)
+    print('Client disconnected — keeping sessions alive for reconnect')
+    pass
 
 @socketio.on('start_stream')
 def handle_start_stream(data):
@@ -564,7 +627,11 @@ def stream_video(camera_id):
                     if state['source_type'] == 'video':
                         socketio.emit('stream_end', {'camera_id': camera_id, 'message': 'Video ended'})
                         state['processing'] = False
-                    break
+                        break
+                    else:
+                        # Webcam: transient read failure — retry
+                        socketio.sleep(0.05)
+                        continue
 
                 frame        = comp['video_processor'].resize_frame(frame, Config.MAX_FRAME_WIDTH)
                 detections   = yolo_detector.detect_people(frame)
@@ -636,10 +703,52 @@ def stream_video(camera_id):
 # Entry Point
 # ============================================================
 
+def resume_cameras_from_db():
+    print("[Startup] Auto-resuming cameras from database...")
+    db = db_session()
+    try:
+        from backend.database.models import Camera
+        cameras = db.query(Camera).all()
+        for cam in cameras:
+            if cam.session_id in sessions:
+                continue
+                
+            print(f"[Startup] Resuming camera: {cam.name} ({cam.filepath})")
+            session = create_session(cam.session_id, cam.name, cam.area_id, cam.camera_type, cam.description)
+
+            # Determine source type
+            fp = cam.filepath
+            try:
+                if fp.startswith('webcam:'):
+                    idx = int(fp.split(':')[1])
+                    _ = session['components']['video_processor'].open_webcam(idx)
+                    session['state']['source_type'] = 'webcam'
+                elif 'youtube.com' in fp or 'youtu.be' in fp or fp.startswith('http') or fp.startswith('rtsp'):
+                    _ = session['components']['video_processor'].open_stream_url(fp)
+                    session['state']['source_type'] = 'webcam' # retry-mode
+                elif fp:
+                    _ = session['components']['video_processor'].open_video(fp)
+                    session['state']['source_type'] = 'video'
+                else:
+                    raise ValueError("No filepath")
+
+                session['state']['processing'] = True
+                socketio.start_background_task(stream_video, cam.session_id)
+            except Exception as e:
+                print(f"[Startup] Failed to resume camera {cam.name}: {e}")
+                delete_session(cam.session_id)
+    finally:
+        db.close()
+
 if __name__ == '__main__':
     print("=" * 55)
     print("  CrowdShield — Multi-Camera AI Safety System")
     print("=" * 55)
     print(f"  Dashboard → http://localhost:5000")
     print("=" * 55)
+    
+    # Fire and forget startup hook using standard threading to avoid event loop issues
+    import threading
+    threading.Thread(target=resume_cameras_from_db, daemon=True).start()
+    
     socketio.run(app, host='0.0.0.0', port=5000, debug=Config.DEBUG)
