@@ -112,8 +112,8 @@ def run_alert_router(camera_id, risk_level, camera_type, area_id):
 
     prev = area_alert_state.get(area_id, {'alerted': False, 'high_count': 0})
 
-    # -- Rule 1: Single camera HIGH (any type) → notify area personnel (in-app)
-    if risk_level == 'HIGH':
+    # Rule 1 silenced as per request
+    if False and risk_level == 'HIGH':
         if camera_type == 'exit':
             # Rule 2: Exit camera HIGH → softer message
             msg  = f"High traffic detected at EXIT camera '{sessions[camera_id]['camera_name']}'. Monitor outflow pressure."
@@ -239,21 +239,27 @@ def update_area(area_id):
 
 @app.route('/api/areas/<int:area_id>', methods=['DELETE'])
 def delete_area(area_id):
+    print(f"[DB] DELETE Area {area_id}")
     db = db_session()
     try:
-        area = db.get(Area, area_id)
+        # Use explicit filter query (bypasses SQLAlchemy identity cache)
+        area = db.query(Area).filter(Area.id == area_id).first()
         if not area:
-
-            return jsonify({'error': 'Area not found'}), 404
+            print(f"[DB] Area {area_id} not in database. All area IDs: {[a.id for a in db.query(Area).all()]}")
+            return jsonify({'error': f'Area {area_id} not found'}), 404
         # Stop all running sessions for cameras in this area
         for cam in area.cameras:
             delete_session(cam.session_id)
         db.delete(area)
         db.commit()
+        print(f"[DB] Area {area_id} deleted successfully.")
         return jsonify({'message': f'Area {area_id} deleted'})
     except Exception as e:
         db.rollback()
+        print(f"[DB] Error deleting area {area_id}: {e}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
 
 
 @app.route('/api/areas/<int:area_id>/alert', methods=['POST'])
@@ -601,8 +607,37 @@ def handle_disconnect():
 @socketio.on('start_stream')
 def handle_start_stream(data):
     camera_id = data.get('camera_id') if isinstance(data, dict) else None
-    if not camera_id or camera_id not in sessions:
+    if not camera_id:
         return
+        
+    # If session is missing (e.g. server restart), try to re-initialize from DB
+    if camera_id not in sessions:
+        db = db_session()
+        try:
+            cam = db.query(Camera).filter_by(session_id=camera_id).first()
+            if cam:
+                print(f"[Socket] Resurrecting session for {camera_id}...")
+                create_session(
+                    camera_id, 
+                    cam.name, 
+                    cam.area_id, 
+                    cam.camera_type or 'other', 
+                    cam.description or ''
+                )
+                # Re-open stream (Check if it's a URL or local path)
+                if cam.filepath.startswith('http'):
+                    sessions[camera_id]['components']['video_processor'].open_stream_url(cam.filepath)
+                else:
+                    sessions[camera_id]['components']['video_processor'].open_video(cam.filepath)
+            else:
+                return
+        except Exception as e:
+            print(f"[Socket] Failed to resurrect session {camera_id}: {e}")
+            return
+        finally:
+            db.close()
+
+    sessions[camera_id]['state']['processing'] = True
     socketio.start_background_task(stream_video, camera_id)
     print(f"Streaming task launched for {camera_id}")
 
@@ -620,6 +655,7 @@ def stream_video(camera_id):
         initialize_yolo()
         my_session_id = state['stream_session_id']
         print(f"[{camera_id}] Stream started (session_id={my_session_id})")
+        frame_count = 0
         while state['processing'] and state['stream_session_id'] == my_session_id:
             try:
                 frame, success = comp['video_processor'].read_frame()
@@ -632,6 +668,10 @@ def stream_video(camera_id):
                         # Webcam: transient read failure — retry
                         socketio.sleep(0.05)
                         continue
+
+                frame_count += 1
+                if frame_count % Config.FRAME_SKIP != 0:
+                    continue
 
                 frame        = comp['video_processor'].resize_frame(frame, Config.MAX_FRAME_WIDTH)
                 detections   = yolo_detector.detect_people(frame)
@@ -687,6 +727,7 @@ def stream_video(camera_id):
                     'alerts':      risk_result['alerts'],
                     'lstm_score':  risk_result.get('lstm_score', 0.0),
                     'lstm_level':  risk_result.get('lstm_level', 'SAFE'),
+                    'kinetic_score': risk_result['factors'].get('movement', 0.0),
                 })
                 socketio.sleep(0.03)
             except Exception as fe:
@@ -747,8 +788,9 @@ if __name__ == '__main__':
     print(f"  Dashboard → http://localhost:5000")
     print("=" * 55)
     
-    # Fire and forget startup hook using standard threading to avoid event loop issues
-    import threading
-    threading.Thread(target=resume_cameras_from_db, daemon=True).start()
+    # Auto-resume disabled — YouTube streams expire and cause 429 rate-limit errors on startup
+    # Uncomment below to re-enable auto-resume for local video files / RTSP cameras only
+    # import threading
+    # threading.Thread(target=resume_cameras_from_db, daemon=True).start()
     
     socketio.run(app, host='0.0.0.0', port=5000, debug=Config.DEBUG)

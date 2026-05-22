@@ -19,7 +19,7 @@ class Config:
     MEDIUM_RISK_THRESHOLD = float(os.getenv('MEDIUM_RISK_THRESHOLD', '0.55'))
     
     # YOLO configuration
-    YOLO_MODEL = os.getenv('YOLO_MODEL', 'yolov8m.pt')
+    YOLO_MODEL = os.getenv('YOLO_MODEL', 'yolov8s.pt')
     CONFIDENCE_THRESHOLD = float(os.getenv('CONFIDENCE_THRESHOLD', '0.25'))
     
     # Video processing settings

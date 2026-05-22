@@ -125,12 +125,17 @@ async function loadAreas() {
     try {
         const res = await fetch('/api/areas');
         const list = await res.json();
+        
+        // Clear existing state and DOM on reload/reconnect
+        areas = {};
+        sessions = {};
+        document.querySelectorAll('.area-section').forEach(el => el.remove());
+        document.querySelectorAll('.sidebar-area-item').forEach(el => el.remove());
+        
         list.forEach(a => {
             areas[a.id] = { ...a, cameras: {}, personnel: a.personnel || [] };
             renderAreaSection(a.id, a);
             renderAreaSidebarItem(a.id, a);
-
-
             // Register cameras that already exist in the DB
             (a.cameras || []).forEach(cam => {
                 sessions[cam.session_id] = {
@@ -508,24 +513,27 @@ function addCameraCardToArea(areaId, cameraId, cameraName, cameraType = 'other',
         <div class="cam-video-wrap">
             <img id="feed-${cameraId}" src="" alt="Live Feed" style="display:none;">
             <div class="cam-placeholder" id="placeholder-${cameraId}">
-                <div class="cam-placeholder-icon">...</div>
-                <span>Awaiting stream...</span>
+                <div class="cam-placeholder-icon">⏻</div>
+                <button class="btn-primary" style="margin-top:10px; padding:6px 14px; font-size:0.85rem;" onclick="socket.emit('start_stream', { camera_id: '${cameraId}' })">
+                    Resume Monitoring
+                </button>
             </div>
             <div class="cam-risk-badge LOW" id="badge-${cameraId}">LOW</div>
         </div>
 
         <div class="cam-stats">
-            <div class="cam-stat">
-                <div class="cam-stat-label">People</div>
-                <div class="cam-stat-value" id="count-${cameraId}">—</div>
-            </div>
+            <!-- People count removed as per request -->
             <div class="cam-stat">
                 <div class="cam-stat-label">LSTM Score</div>
                 <div class="cam-stat-value" id="lstm-${cameraId}">—</div>
             </div>
             <div class="cam-stat">
-                <div class="cam-stat-label">LSTM Status</div>
-                <div class="cam-stat-value" id="lstmStatus-${cameraId}">—</div>
+                <div class="cam-stat-label">System Status</div>
+                <div class="cam-stat-value" id="status-${cameraId}">—</div>
+            </div>
+            <div class="cam-stat">
+                <div class="cam-stat-label">Kinetic Pressure</div>
+                <div class="cam-stat-value" id="kinetic-${cameraId}">—</div>
             </div>
         </div>
         <div class="cam-alerts" id="alerts-${cameraId}">
@@ -551,14 +559,26 @@ function updateCameraCard(cameraId, data) {
     const ph = document.getElementById(`placeholder-${cameraId}`);
     if (img && data.frame) { img.src = 'data:image/jpeg;base64,' + data.frame; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
 
-    const ce = document.getElementById(`count-${cameraId}`);
-    if (ce) { ce.textContent = data.crowd_count; ce.className = `cam-stat-value v-${risk.toLowerCase()}`; }
+    // People count update removed as per request
+    // const ce = document.getElementById(`count-${cameraId}`);
+    // if (ce) { ce.textContent = data.crowd_count; ce.className = `cam-stat-value v-${risk.toLowerCase()}`; }
 
     const le = document.getElementById(`lstm-${cameraId}`);
     if (le) le.textContent = `${(data.lstm_score * 100).toFixed(1)}%`;
 
-    const ls = document.getElementById(`lstmStatus-${cameraId}`);
-    if (ls) { ls.textContent = data.lstm_level || '—'; ls.className = `cam-stat-value ${data.lstm_level === 'UNSAFE' ? 'v-high' : 'v-low'}`; }
+    const statusEl = document.getElementById(`status-${cameraId}`);
+    if (statusEl) {
+        // Combined logic: Unsafe if LSTM > 80% OR Kinetic > 60% OR Risk is HIGH
+        const isUnsafe = (data.lstm_score > 0.8) || (data.kinetic_score > 0.6) || (risk === 'HIGH');
+        statusEl.textContent = isUnsafe ? 'UNSAFE' : 'SAFE';
+        statusEl.className = `cam-stat-value ${isUnsafe ? 'v-high' : 'v-low'}`;
+    }
+
+    const ks = document.getElementById(`kinetic-${cameraId}`);
+    if (ks) { 
+        ks.textContent = `${(data.kinetic_score * 100).toFixed(1)}%`; 
+        ks.className = `cam-stat-value ${data.kinetic_score > 0.6 ? 'v-high' : 'v-low'}`;
+    }
 
     const ae = document.getElementById(`alerts-${cameraId}`);
     if (ae) {
@@ -810,6 +830,10 @@ async function sendManualAlert(areaId) {
         const res = await fetch(`/api/areas/${areaId}/alert`, { method: 'POST' });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error);
+        
+        // Trigger the big red UI alert locally
+        showAreaEscalationBanner(areaId, "MANUAL ALERT ACTIVE", "!");
+        
         showToast('Manual alert sent successfully', 'success');
     } catch (e) {
         showToast(`Failed to send alert: ${e.message}`, 'error');

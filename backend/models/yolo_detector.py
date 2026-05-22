@@ -30,8 +30,8 @@ class YOLODetector:
                 'centers': list of person centers [(x, y), ...]
             }
         """
-        # Run YOLO detection with higher resolution and explicit confidence
-        results = self.model(frame, verbose=False, imgsz=1280, conf=self.confidence_threshold)[0]
+        # Run YOLO detection with faster resolution
+        results = self.model(frame, verbose=False, imgsz=640, conf=self.confidence_threshold)[0]
         
         people_boxes = []
         confidences = []
@@ -84,14 +84,9 @@ class YOLODetector:
             cv2.putText(annotated_frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             
-            # Draw center point
-            center = detections['centers'][i]
+        # Draw center points (anonymous)
+        for center in detections['centers']:
             cv2.circle(annotated_frame, center, 3, (255, 0, 0), -1)
-        
-        # Draw total count
-        count_text = f'People Count: {detections["count"]}'
-        cv2.putText(annotated_frame, count_text, (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         
         return annotated_frame
     

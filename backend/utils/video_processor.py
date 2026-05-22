@@ -78,6 +78,8 @@ class VideoProcessor:
         # Set resolution
         self.current_source.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.current_source.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Minimize buffer to 1 to ensure real-time (no lag buildup)
+        self.current_source.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         width  = int(self.current_source.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.current_source.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -96,20 +98,42 @@ class VideoProcessor:
         if 'youtube.com' in url or 'youtu.be' in url:
             try:
                 import yt_dlp
-                ydl_opts = {
-                    'format': 'best[ext=mp4]/best',
-                    'quiet':  True,
-                }
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    stream_url = info['url']
-                    print(f"[stream] Resolved YouTube URL -> {stream_url[:80]}...")
+                
+                # Multi-client fallback strategy (iOS usually works best, then Android)
+                clients = ['ios', 'android', 'web']
+                resolved_url = None
+                
+                for client in clients:
+                    ydl_opts = {
+                        'format': 'best', # Allow any best format (including m3u8 for live)
+                        'quiet':  True,
+                        'no_warnings': True,
+                        'extractor_args': {'youtube': {'player_client': [client]}},
+                    }
+                    try:
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            info = ydl.extract_info(url, download=False)
+                            if 'url' in info:
+                                resolved_url = info['url']
+                                print(f"[stream] Resolved via {client} player client")
+                                break
+                    except Exception:
+                        continue
+                
+                if not resolved_url:
+                    raise ValueError("YouTube blocked the request or no formats found.")
+                    
+                stream_url = resolved_url
+                print(f"[stream] Resolved YouTube URL -> {stream_url[:80]}...")
             except ImportError:
                 raise ValueError("yt-dlp is not installed. Run: pip install yt-dlp")
             except Exception as e:
                 raise ValueError(f"Failed to resolve YouTube stream: {e}")
 
         cap = cv2.VideoCapture(stream_url)
+        # Minimize buffer to 1 to ensure real-time (no lag buildup)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
         if not cap.isOpened():
             raise ValueError(f"Failed to open stream: {url}")
 
