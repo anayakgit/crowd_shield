@@ -357,7 +357,10 @@ async function runAiAudit() {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        auditText.innerHTML = data.report.replace(/\n/g, '<br>');
+        // Render as proper markdown HTML
+        auditText.innerHTML = typeof marked !== 'undefined'
+            ? marked.parse(data.report)
+            : data.report.replace(/\n/g, '<br>');
     } catch (e) {
         auditText.innerHTML = 'Error communicating with AI Advisor.';
     }

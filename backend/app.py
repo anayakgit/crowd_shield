@@ -579,14 +579,17 @@ def planner_audit():
     data = request.get_json(silent=True) or {}
     dimensions = data.get('dimensions', {'width': 40, 'height': 20})
     exits      = data.get('exits', [])
+    entries    = data.get('entries', [])
     cameras    = data.get('cameras', [])
+    zones      = data.get('zones', [])
+    sources    = data.get('sources', [])
     
     # Initialize advisor if not already
     global notifier # unrelated but using global pattern
     from backend.utils.llm_advisor import LLMAdvisor
     advisor = LLMAdvisor()
     
-    report = advisor.run_safety_audit(dimensions, exits, cameras)
+    report = advisor.run_safety_audit(dimensions, exits, cameras, entries=entries, zones=zones, sources=sources)
     return jsonify({'report': report})
 
 
