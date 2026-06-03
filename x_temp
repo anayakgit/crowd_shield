@@ -1,0 +1,23 @@
+Main Method: calculate_risk_level
+It computes four independent sub-scores and blends them with weights:
+ComponentWeight What it measures
+Density 40%How packed the crowd is relative to frame 
+areaMovement20%Speed, erratic motion, panic indicatorsIoT10%Temperature, noise, humidity from sensorsLSTM30%AI model's predicted stampede probability
+The final score maps to LOW/MEDIUM/HIGH via thresholds, with a hard override to HIGH if the LSTM is >80% confident regardless of the weighted score.
+
+Supporting Methods
+
+calculate_pressure_map — implements the P=ρ⋅v⋅ΩP = \rho \cdot v \cdot \Omega
+P=ρ⋅v⋅Ω formula from the report, multiplying density × speed × directional conflict
+_calculate_direction_conflict — scans each cell's neighbors and counts opposing vectors (dot product < -0.5), producing the Ω\Omega
+Ω conflict multiplier in range [1.0, 2.0]
+predict_contagion_spread — runs a 3-iteration grid simulation where panic propagates to adjacent high-density cells, each spreading at 70% intensity weighted by neighbor density
+track_panic_initiators — identifies the first people showing panic gestures by diffing against a 60-second rolling history
+get_risk_trend — splits the last 10 risk scores into two halves and compares means to return increasing, decreasing, or stable
+
+
+Key Design Decisions worth noting
+
+The LSTM is optional — if the model file isn't loaded, lstm_score defaults to 0.0 and the system still works on deterministic math alone
+Density is normalized against a 640×480 reference frame so scores stay consistent across different camera resolutions
+The pressure history and risk history are capped at 30 and 100 entries respectively to avoid unbounded memory growth
