@@ -1,6 +1,10 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+
 import cv2
 import numpy as np
 import os
@@ -8,6 +12,8 @@ import base64
 import uuid
 import time
 import traceback
+import asyncio
+import threading
 from datetime import datetime
 
 from backend.config import Config
@@ -18,17 +24,30 @@ from backend.utils.video_processor import VideoProcessor
 from backend.utils.digital_twin import DigitalTwin
 from backend.utils.notifier import Notifier
 from backend.database.models import init_db, SessionLocal, Area, Personnel, Camera
+# from backend import ws_server
 
 # --------------------------------------------------------------------------
 # Flask + SocketIO
 # --------------------------------------------------------------------------
+
+# def launch_ws_server():
+#     try:
+#         import uvicorn
+#         print('[WS] Starting websocket server on port 8000')
+#         uvicorn.run(ws_server.app, host='0.0.0.0', port=8000, log_level='info')
+#     except Exception as e:
+#         print(f'[WS] Failed to start websocket server: {e}')
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.config['SECRET_KEY'] = Config.SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet'
+)
 
 os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 
@@ -265,31 +284,68 @@ def delete_area(area_id):
 @app.route('/api/areas/<int:area_id>/alert', methods=['POST'])
 def send_manual_alert(area_id):
     db = db_session()
+
     try:
         area = db.get(Area, area_id)
+
         if not area:
             return jsonify({'error': 'Area not found'}), 404
-        
-        area_cameras = {cid: s for cid, s in sessions.items() if s['area_id'] == area_id}
+
+        area_cameras = {
+            cid: s for cid, s in sessions.items()
+            if s['area_id'] == area_id
+        }
+
         max_risk = 'MANUAL'
         crowd_count = 0
+
         for s in area_cameras.values():
             r = s['state']['risk_level']
+
             if r == 'HIGH':
                 max_risk = 'HIGH'
             elif r == 'MEDIUM' and max_risk != 'HIGH':
                 max_risk = 'MEDIUM'
+
             crowd_count += s['state']['crowd_count']
-            
-        alerts = [{'action': 'Check immediately', 'message': f'Manual alert triggered by user for area: {area.name}'}]
-        
-        success = notifier.send_email_alert(max_risk, crowd_count, alerts, manual=True)
-        if success:
-            return jsonify({'message': 'Alert sent successfully'})
-        else:
-            return jsonify({'error': 'Failed to send alert. Check SMTP config.'}), 500
+
+        alerts = [{
+            'action': 'Check immediately',
+            'message': f'Manual alert triggered by user for area: {area.name}'
+        }]
+
+        alert_payload = {
+            'type': 'manual_alert',
+            'area_id': area_id,
+            'area_name': area.name,
+            'risk_level': max_risk,
+            'crowd_count': crowd_count,
+            'message': alerts[0]['message'],
+            'manual': True,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        # Emit alert to all connected Flutter clients
+        socketio.emit('alert', alert_payload)
+
+        print("[SocketIO] Alert emitted successfully")
+
+        # Optional email alert
+        notifier.send_email_alert(
+            max_risk,
+            crowd_count,
+            alerts,
+            manual=True
+        )
+
+        return jsonify({
+            'message': 'Alert emitted successfully'
+        }), 200
+
     except Exception as e:
+        print(f"[ALERT ERROR] {e}")
         return jsonify({'error': str(e)}), 500
+
     finally:
         db.close()
 
@@ -795,5 +851,6 @@ if __name__ == '__main__':
     # Uncomment below to re-enable auto-resume for local video files / RTSP cameras only
     # import threading
     # threading.Thread(target=resume_cameras_from_db, daemon=True).start()
-    
+
+    # threading.Thread(target=launch_ws_server, daemon=True).start()
     socketio.run(app, host='0.0.0.0', port=5000, debug=Config.DEBUG)
